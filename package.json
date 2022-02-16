@@ -1,0 +1,57 @@
+{
+  "name": "@codingame/languageserver-mutualized",
+  "version": "1.0.0",
+  "description": "A tool to plug multiple clients over a single language server implementation",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/CodinGame/languageserver-mutualized"
+  },
+  "files": [
+    "package.json",
+    "dist/"
+  ],
+  "scripts": {
+    "test": "jest",
+    "test:watch": "jest --watch",
+    "build": "npm run lint && npm run compile && npm run test",
+    "compile": "tsc",
+    "lint": "eslint --ext ts src"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@codingame/monaco-jsonrpc": "^0.3.1",
+    "debounce": "^1.2.1",
+    "delay": "^5.0.0",
+    "fast-diff": "^1.2.0",
+    "object-hash": "^2.2.0",
+    "set-value": "^4.1.0",
+    "url": "^0.11.0",
+    "vscode-languageserver": "^7.0.0",
+    "vscode-languageserver-protocol": "^3.16.0",
+    "vscode-languageserver-textdocument": "^1.0.4",
+    "winston": "^3.6.0"
+  },
+  "devDependencies": {
+    "@types/debounce": "^1.2.1",
+    "@types/jest": "^27.4.0",
+    "@types/ms": "^0.7.31",
+    "@types/object-hash": "^2.2.1",
+    "@types/set-value": "^4.0.1",
+    "@typescript-eslint/eslint-plugin": "^5.12.0",
+    "@typescript-eslint/parser": "^5.12.0",
+    "eslint": "^7.32.0",
+    "eslint-config-standard": "^16.0.3",
+    "eslint-plugin-import": "^2.25.4",
+    "eslint-plugin-jest": "^26.1.1",
+    "eslint-plugin-n": "^14.0.0",
+    "eslint-plugin-promise": "^6.0.0",
+    "eslint-plugin-unused-imports": "^2.0.0",
+    "jest": "^27.5.1",
+    "standard": "^16.0.4",
+    "ts-jest": "^27.1.3",
+    "typescript": "^4.5.5"
+  }
+}
