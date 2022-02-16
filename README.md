@@ -35,7 +35,7 @@ npm install @codingame/languageserver-mutualized
 There is an example that demonstrate how the languageserver-mutualized can be used.
 It uses [monaco-editor](https://github.com/microsoft/monaco-editor) and [monaco-languageclient](https://github.com/TypeFox/monaco-languageclient).
 
-The important file is [json-server-launcher.ts](https://github.com/CodinGame/languageserver-mutualized/blob/master/example/src/json-server-launcher.ts)
+The important file is [json-server-launcher.ts](https://github.com/CodinGame/languageserver-mutualized/blob/main/example/src/json-server-launcher.ts)
 
 To run it:
 ```bash
