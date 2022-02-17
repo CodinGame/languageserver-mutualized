@@ -1,5 +1,5 @@
-import 'monaco-editor-core'
-import * as monaco from 'monaco-editor-core'
+import 'monaco-editor'
+import * as monaco from 'monaco-editor'
 
 declare global {
   interface Window extends monaco.Window {
@@ -7,6 +7,6 @@ declare global {
 }
 
 window.MonacoEnvironment = {
-  getWorkerUrl: () => './editor.worker.bundle.js'
+  getWorkerUrl: () => './editor.worker.js'
 }
 import('./client')

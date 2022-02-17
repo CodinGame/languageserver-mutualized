@@ -6,7 +6,7 @@ import path from 'path'
 const config: Configuration = {
   entry: {
     main: path.resolve(__dirname, 'src/main.ts'),
-    'editor.worker': 'monaco-editor-core/esm/vs/editor/editor.worker.js'
+    'editor.worker': 'monaco-editor/esm/vs/editor/editor.worker.js'
   },
   devtool: 'source-map',
   mode: 'development',
@@ -16,7 +16,8 @@ const config: Configuration = {
       use: ['style-loader', 'css-loader']
     }, {
       test: /\.ttf$/,
-      use: ['file-loader']
+      type: 'asset/resource',
+      dependency: { not: ['url'] }
     }, {
       test: /\.(js|ts)$/,
       enforce: 'pre',
@@ -35,7 +36,8 @@ const config: Configuration = {
   target: 'web',
   resolve: {
     alias: {
-      vscode: require.resolve('@codingame/monaco-languageclient/lib/vscode-compatibility')
+      vscode: require.resolve('@codingame/monaco-languageclient/lib/vscode-compatibility'),
+      'monaco-editor$': require.resolve('monaco-editor/esm/vs/editor/edcore.main') // useful to disable languages/workers
     },
     extensions: ['.js', '.json', '.ttf', '.ts']
   },

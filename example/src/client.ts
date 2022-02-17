@@ -1,17 +1,23 @@
 import { listen } from '@codingame/monaco-jsonrpc'
-import * as monaco from 'monaco-editor-core'
+import * as monaco from 'monaco-editor'
 import {
   MonacoLanguageClient, MessageConnection, CloseAction, ErrorAction,
   MonacoServices, createConnection
 } from '@codingame/monaco-languageclient'
 import normalizeUrl from 'normalize-url'
+import 'monaco-editor/esm/vs/language/json/monaco.contribution'
 
-// register Monaco languages
-monaco.languages.register({
-  id: 'json',
-  extensions: ['.json', '.bowerrc', '.jshintrc', '.jscsrc', '.eslintrc', '.babelrc'],
-  aliases: ['JSON', 'json'],
-  mimetypes: ['application/json']
+monaco.languages.json.jsonDefaults.setModeConfiguration({
+  colors: false,
+  completionItems: false,
+  diagnostics: false,
+  documentFormattingEdits: false,
+  documentRangeFormattingEdits: false,
+  documentSymbols: false,
+  hovers: false,
+  foldingRanges: false,
+  selectionRanges: false,
+  tokens: true
 })
 
 // create Monaco editor
@@ -19,6 +25,16 @@ const value = `{
     "$schema": "http://json.schemastore.org/coffeelint",
     "line_endings": "unix"
 }`
+
+
+monaco.editor.create(document.getElementById('container2')!, {
+  model: monaco.editor.createModel(value, 'json', monaco.Uri.parse(`inmemory://model-${(Math.random() * 1000).toFixed(0)}.json`)),
+  glyphMargin: true,
+  lightbulb: {
+    enabled: true
+  }
+})
+
 const synchronizeWebSocket = createWebSocket(createUrl('/synchronize'))
 const editor = monaco.editor.create(document.getElementById('container1')!, {
   model: monaco.editor.createModel(value, 'json', monaco.Uri.parse('inmemory://model.json')),
@@ -37,14 +53,6 @@ synchronizeWebSocket.onmessage = message => {
     }
   })
 }
-
-monaco.editor.create(document.getElementById('container2')!, {
-  model: monaco.editor.createModel(value, 'json', monaco.Uri.parse(`inmemory://model-${(Math.random() * 1000).toFixed(0)}.json`)),
-  glyphMargin: true,
-  lightbulb: {
-    enabled: true
-  }
-})
 
 // install Monaco language client services
 MonacoServices.install(monaco)
