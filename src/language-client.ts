@@ -24,6 +24,7 @@ import { WatchableServerCapabilities } from './capabilities'
 import { lspDiff } from './tools/lsp'
 import { ConnectionRequestCache, createMemoizedConnection } from './tools/cache'
 import { allVoidMerger, MultiRequestHandler, RequestHandlerRegistration, singleHandlerMerger } from './tools/request-handler'
+import { runWithTimeout } from './tools/node'
 
 export enum LanguageClientDisposeReason {
   Remote,
@@ -239,8 +240,35 @@ export class LanguageClient implements Disposable {
       return
     }
 
+    /**
+     * Computing a diff can take a LONG time (> 1 second) when the old code and the new code are very different (after a copy/paste for instance).
+     *
+     * The change comming from the client is probably a whole code replacement already,
+     * but we have no way to know it here because it's only managed in vscode-languageserver `TextDocuments` class.
+     *
+     * There is no point of building a HUGE minimal diff when computing it from 2 different codes.
+     * Running a fonction for more than some milliseconds blocks the javascript event loop, making everyone else freeze, so it's not acceptable.
+     *
+     * There is also no simple heuristic to know if 2 codes are closer to each other or not.
+     *
+     * So the simplest way is to try to compute the diff but give up if it takes to much time.
+     * The only consequence of it is it will make the LSP think the whole file was changed,
+     * leading to a new parsing of it (But I doubt sending a huge diff is better).
+     */
+
+    const lspDiffWithTimeout = (oldCode: string, newCode: string) => {
+      try {
+        return runWithTimeout(() => lspDiff(oldCode, newCode), 20)
+      } catch (error) {
+        this.options.logger?.error('Unable to compute diff between old code and new code, resetting the whole code', { error })
+        return [{
+          text: newCode
+        }]
+      }
+    }
+
     const contentChanges = documentSyncKind === TextDocumentSyncKind.Incremental
-      ? lspDiff(currentDocument.getText(), newCode)
+      ? lspDiffWithTimeout(currentDocument.getText(), newCode)
       : [{
           text: newCode
         }]
@@ -368,7 +396,7 @@ export class LanguageClient implements Disposable {
         textDocument: {
           uri: document.uri
         },
-        reason: reason
+        reason
       })
     }
   }
