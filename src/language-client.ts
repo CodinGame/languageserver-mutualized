@@ -5,7 +5,7 @@ import {
   LogMessageNotification, WorkspaceFoldersRequest, WorkDoneProgressCreateRequest, ShutdownRequest, ShowMessageNotification,
   ShowMessageRequest, DidOpenTextDocumentNotification,
   DidCloseTextDocumentNotification, TextDocumentSyncKind, DidChangeTextDocumentNotification, ExecuteCommandRequest,
-  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit
+  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions
 } from 'vscode-languageserver-protocol'
 import {
   ApplyWorkspaceEditRequest,
@@ -21,7 +21,7 @@ import { DocumentUri, TextDocument } from 'vscode-languageserver-textdocument'
 import winston from 'winston'
 import debounce from 'debounce'
 import { WatchableServerCapabilities } from './capabilities'
-import { lspDiff } from './tools/lsp'
+import { lspDiff, matchDocument } from './tools/lsp'
 import { ConnectionRequestCache, createMemoizedConnection } from './tools/cache'
 import { allVoidMerger, MultiRequestHandler, RequestHandlerRegistration, singleHandlerMerger } from './tools/request-handler'
 import { runWithTimeout } from './tools/node'
@@ -181,6 +181,18 @@ export class LanguageClient implements Disposable {
 
     const initializationResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
     this.serverCapabilities = new WatchableServerCapabilities(initializationResult.capabilities)
+    this.serverCapabilities.onRegistrationRequest((request) => {
+      for (const registration of request.registrations) {
+        if (registration.method === DidOpenTextDocumentNotification.method) {
+          const options: TextDocumentRegistrationOptions = registration.registerOptions
+          for (const document of this.currentDocuments.values()) {
+            if (matchDocument(options.documentSelector, document)) {
+              this.sendDidOpenNotification(document)
+            }
+          }
+        }
+      }
+    })
 
     connection.sendNotification(InitializedNotification.type, {})
 
@@ -204,19 +216,22 @@ export class LanguageClient implements Disposable {
     return this.logMessages
   }
 
+  private sendDidOpenNotification (document: TextDocument) {
+    const textDocumentItem = TextDocumentItem.create(document.uri, document.languageId, document.version, document.getText())
+    this.connection!.sendNotification(DidOpenTextDocumentNotification.type, {
+      textDocument: textDocumentItem
+    })
+  }
+
   private openDocument (document: TextDocument) {
     if (this.isDocumentOpen(document.uri)) {
       return
     }
     const serverCapabilities = this.serverCapabilities!
-    const serverConnection = this.connection!
     const newTextDocument = TextDocument.create(document.uri, document.languageId, 1, document.getText())
     this.currentDocuments.set(document.uri, newTextDocument)
     if (serverCapabilities.getTextDocumentNotificationOptions(DidOpenTextDocumentNotification.type, newTextDocument) != null) {
-      const textDocumentItem = TextDocumentItem.create(newTextDocument.uri, newTextDocument.languageId, newTextDocument.version, newTextDocument.getText())
-      serverConnection.sendNotification(DidOpenTextDocumentNotification.type, {
-        textDocument: textDocumentItem
-      })
+      this.sendDidOpenNotification(newTextDocument)
     }
 
     this._onDocumentOpen.fire(newTextDocument)
