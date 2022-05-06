@@ -5,11 +5,16 @@ import {
 } from 'vscode-languageserver'
 import {
   ClientCapabilities, DidChangeTextDocumentNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification,
+  DidSaveTextDocumentNotification,
+  ProtocolNotificationType,
+  ProtocolRequestType,
   SaveOptions,
-  ServerCapabilities, TextDocumentSyncKind, TextDocumentSyncOptions, WorkspaceFoldersRequest
+  ServerCapabilities, TextDocumentRegistrationOptions, TextDocumentSaveRegistrationOptions, TextDocumentSyncKind, TextDocumentSyncOptions, WillSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, WorkspaceFoldersRequest
 } from 'vscode-languageserver-protocol'
 import * as rpc from '@codingame/monaco-jsonrpc'
 import winston from 'winston'
+import { TextDocument } from 'vscode-languageserver-textdocument'
+import { matchDocument } from './tools/lsp'
 
 export function isNumber (value: unknown): value is number {
   return typeof value === 'number' || value instanceof Number
@@ -107,14 +112,50 @@ export function synchronizeLanguageServerCapabilities (
   }
 }
 
+function resolveSaveOptions (save?: boolean | SaveOptions): TextDocumentSaveRegistrationOptions | undefined {
+  if (typeof save === 'boolean') {
+    return save
+      ? {
+          includeText: false,
+          documentSelector: null
+        }
+      : undefined
+  }
+  return {
+    ...save,
+    documentSelector: null
+  }
+}
+
+function getStaticRegistrationOptions<R> (notifType: RegistrationType<R>, sync: TextDocumentSyncOptions): R | undefined {
+  switch (notifType.method) {
+    case DidOpenTextDocumentNotification.method:
+    case DidCloseTextDocumentNotification.method: {
+      return ((sync.openClose ?? false) ? { documentSelector: null } : undefined) as unknown as R
+    }
+    case DidChangeTextDocumentNotification.method: {
+      return (sync.change != null ? ({ documentSelector: null, syncKind: sync.change }) : undefined) as unknown as R
+    }
+    case DidSaveTextDocumentNotification.method: {
+      return resolveSaveOptions(sync.save) as unknown as R
+    }
+    case WillSaveTextDocumentNotification.method: {
+      return ((sync.willSave ?? false) ? { documentSelector: null } : undefined) as unknown as R
+    }
+    case WillSaveTextDocumentWaitUntilRequest.method: {
+      return ((sync.willSaveWaitUntil ?? false) ? { documentSelector: null } : undefined) as unknown as R
+    }
+  }
+}
+
 export class WatchableServerCapabilities {
-  private capabilities: ServerCapabilities<unknown>
+  private capabilities: ServerCapabilities<void>
   private registrationRequests: Registration[]
 
   private _onRegistrationRequest = new Emitter<RegistrationParams>()
   private _onUnregistrationRequest = new Emitter<UnregistrationParams>()
 
-  constructor (capabilities: ServerCapabilities<unknown>) {
+  constructor (capabilities: ServerCapabilities<void>) {
     this.capabilities = capabilities
     this.registrationRequests = []
   }
@@ -152,7 +193,7 @@ export class WatchableServerCapabilities {
     })
   }
 
-  public getCapabilities (): ServerCapabilities<unknown> {
+  public getCapabilities (): ServerCapabilities<void> {
     return this.capabilities
   }
 
@@ -160,33 +201,41 @@ export class WatchableServerCapabilities {
     return this.registrationRequests
   }
 
-  public getDynamicRegistration<O> (request: RegistrationType<O>): Registration | undefined {
-    return this.registrationRequests.find(r => r.method === request.method)
+  private getDynamicRegistrations<O> (request: RegistrationType<O>): Registration[] {
+    return this.registrationRequests.filter(r => r.method === request.method)
   }
 
-  public getDynamicRegistrationOptions<O> (request: RegistrationType<O>): O | undefined {
-    return this.getDynamicRegistration(request)?.registerOptions
+  public getDynamicRegistrationOptions<O> (request: RegistrationType<O>): O[] {
+    return this.getDynamicRegistrations(request).map(item => item.registerOptions)
   }
 
-  public getTextDocumentSyncKind (): TextDocumentSyncKind {
-    const syncOpts = this.getCapabilities().textDocumentSync ?? this.getDynamicRegistrationOptions(DidChangeTextDocumentNotification.type)?.syncKind
-    if (typeof syncOpts === 'object') {
-      return syncOpts.change ?? TextDocumentSyncKind.None
-    } else {
-      return syncOpts ?? TextDocumentSyncKind.None
+  private getResolvedDocumentSync (): TextDocumentSyncOptions | undefined {
+    return resolveTextDocumentSync(this.capabilities.textDocumentSync)
+  }
+
+  public onCapabilityChange (list: ProtocolNotificationType<unknown, unknown>[], cb: () => void): Disposable {
+    const methods = new Set(list.map(item => item.method))
+    return this.onRegistrationRequest(({ registrations }) => {
+      if (registrations.some(registration => methods.has(registration.method))) {
+        cb()
+      }
+    })
+  }
+
+  public getTextDocumentNotificationOptions<R extends TextDocumentRegistrationOptions> (
+    messageType: RegistrationType<R>,
+    document: TextDocument
+  ): R | undefined {
+    const textDocumentSync = this.getResolvedDocumentSync()
+    const staticRegistration = textDocumentSync != null ? getStaticRegistrationOptions(messageType, textDocumentSync) : undefined
+    if (staticRegistration != null) {
+      return staticRegistration
     }
-  }
-
-  public getResolvedDocumentSync (): TextDocumentSyncOptions | undefined {
-    return resolveTextDocumentSync(this.getCapabilities().textDocumentSync)
-  }
-
-  public getResolvedDocumentSyncSaveOptions (): SaveOptions | undefined {
-    const saveOptions = this.getResolvedDocumentSync()?.save
-    if (typeof saveOptions === 'boolean') {
-      return saveOptions ? {} : undefined
-    } else {
-      return saveOptions
+    const options = this.getDynamicRegistrationOptions(messageType)
+    for (const option of options) {
+      if (matchDocument(option.documentSelector, document)) {
+        return option
+      }
     }
   }
 }

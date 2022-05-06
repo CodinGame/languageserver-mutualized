@@ -5,7 +5,7 @@ import {
   LogMessageNotification, WorkspaceFoldersRequest, WorkDoneProgressCreateRequest, ShutdownRequest, ShowMessageNotification,
   ShowMessageRequest, DidOpenTextDocumentNotification,
   DidCloseTextDocumentNotification, TextDocumentSyncKind, DidChangeTextDocumentNotification, ExecuteCommandRequest,
-  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier
+  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit
 } from 'vscode-languageserver-protocol'
 import {
   ApplyWorkspaceEditRequest,
@@ -209,11 +209,10 @@ export class LanguageClient implements Disposable {
       return
     }
     const serverCapabilities = this.serverCapabilities!
-    const textDocumentSync = serverCapabilities.getResolvedDocumentSync()
     const serverConnection = this.connection!
     const newTextDocument = TextDocument.create(document.uri, document.languageId, 1, document.getText())
     this.currentDocuments.set(document.uri, newTextDocument)
-    if (textDocumentSync?.openClose ?? false) {
+    if (serverCapabilities.getTextDocumentNotificationOptions(DidOpenTextDocumentNotification.type, newTextDocument) != null) {
       const textDocumentItem = TextDocumentItem.create(newTextDocument.uri, newTextDocument.languageId, newTextDocument.version, newTextDocument.getText())
       serverConnection.sendNotification(DidOpenTextDocumentNotification.type, {
         textDocument: textDocumentItem
@@ -233,7 +232,6 @@ export class LanguageClient implements Disposable {
 
   private updateDocument (document: TextDocument): void {
     const serverCapabilities = this.serverCapabilities!
-    const documentSyncKind = serverCapabilities.getTextDocumentSyncKind()
     const newCode = document.getText()
     const currentDocument = this.currentDocuments.get(document.uri)!
     if (currentDocument.getText() === newCode) {
@@ -267,7 +265,8 @@ export class LanguageClient implements Disposable {
       }
     }
 
-    const contentChanges = documentSyncKind === TextDocumentSyncKind.Incremental
+    const textDocumentChangeOptions = serverCapabilities.getTextDocumentNotificationOptions(DidChangeTextDocumentNotification.type, currentDocument)
+    const contentChanges = textDocumentChangeOptions != null && textDocumentChangeOptions.syncKind === TextDocumentSyncKind.Incremental
       ? lspDiffWithTimeout(currentDocument.getText(), newCode)
       : [{
           text: newCode
@@ -276,7 +275,7 @@ export class LanguageClient implements Disposable {
     const newDocument = TextDocument.update(currentDocument, contentChanges, currentDocument.version + 1)
 
     const serverConnection = this.connection!
-    if (documentSyncKind !== TextDocumentSyncKind.None) {
+    if (textDocumentChangeOptions != null && textDocumentChangeOptions.syncKind !== TextDocumentSyncKind.None) {
       serverConnection.sendNotification(DidChangeTextDocumentNotification.type, {
         textDocument: {
           uri: newDocument.uri,
@@ -301,9 +300,9 @@ export class LanguageClient implements Disposable {
     const currentDocument = this.currentDocuments.get(document.uri)!
 
     const serverCapabilities = this.serverCapabilities!
-    const textDocumentSync = serverCapabilities.getResolvedDocumentSync()
+    const textDocumentCloseOptions = serverCapabilities.getTextDocumentNotificationOptions(DidCloseTextDocumentNotification.type, currentDocument)
     const serverConnection = this.connection!
-    if (textDocumentSync?.openClose ?? false) {
+    if (textDocumentCloseOptions != null) {
       serverConnection.sendNotification(DidCloseTextDocumentNotification.type, {
         textDocument: TextDocumentIdentifier.create(document.uri)
       })
@@ -375,7 +374,7 @@ export class LanguageClient implements Disposable {
   public sendWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): void {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
-    const saveOptions = serverCapabilities.getResolvedDocumentSyncSaveOptions()
+    const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentNotification.type, document)
     if (saveOptions != null) {
       serverConnection.sendNotification(WillSaveTextDocumentNotification.type, {
         textDocument: {
@@ -386,25 +385,26 @@ export class LanguageClient implements Disposable {
     }
   }
 
-  public async sendWillSave (document: TextDocument, reason: TextDocumentSaveReason): Promise<void> {
-    this.sendWillSaveNotification(document, reason)
-
+  public async sendWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason): Promise<TextEdit[] | null> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
-    if (serverCapabilities.getResolvedDocumentSync()?.willSaveWaitUntil ?? false) {
-      await serverConnection.sendRequest(WillSaveTextDocumentWaitUntilRequest.type, {
+    const willSaveWaitUntilOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentWaitUntilRequest.type, document)
+    if (willSaveWaitUntilOptions != null) {
+      return await serverConnection.sendRequest(WillSaveTextDocumentWaitUntilRequest.type, {
         textDocument: {
           uri: document.uri
         },
         reason
       })
     }
+
+    return null
   }
 
   public sendDidSaveNotification (document: TextDocument): void {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
-    const saveOptions = serverCapabilities.getResolvedDocumentSyncSaveOptions()
+    const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(DidSaveTextDocumentNotification.type, document)
     if (saveOptions != null) {
       const includeText = saveOptions.includeText ?? false
       serverConnection.sendNotification(DidSaveTextDocumentNotification.type, {
