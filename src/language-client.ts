@@ -5,7 +5,7 @@ import {
   LogMessageNotification, WorkspaceFoldersRequest, WorkDoneProgressCreateRequest, ShutdownRequest, ShowMessageNotification,
   ShowMessageRequest, DidOpenTextDocumentNotification,
   DidCloseTextDocumentNotification, TextDocumentSyncKind, DidChangeTextDocumentNotification, ExecuteCommandRequest,
-  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions
+  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions, DidChangeWatchedFilesNotification, FileSystemWatcher, FileEvent
 } from 'vscode-languageserver-protocol'
 import {
   ApplyWorkspaceEditRequest,
@@ -56,6 +56,8 @@ export class LanguageClient implements Disposable {
   private _onDocumentChanged = new Emitter<TextDocument>()
   private _onDocumentClosed = new Emitter<TextDocument>()
 
+  private _onDidWatchedFileChanged = new Emitter<FileSystemWatcher[]>()
+
   private serverCapabilities: WatchableServerCapabilities | undefined
   private connectionPromise: Promise<rpc.MessageConnection> | undefined
   private connection: rpc.MessageConnection | undefined
@@ -70,7 +72,6 @@ export class LanguageClient implements Disposable {
   }))
 
   private currentDocuments = new Map<string, TextDocument>()
-  // private currentDocumentMasters = new Map<string, TextDocuments<TextDocument>>()
 
   private synchronizedDocuments: TextDocuments<TextDocument>[] = []
   private logMessages: LogMessageParams[]
@@ -103,6 +104,10 @@ export class LanguageClient implements Disposable {
 
   get onDocumentClosed (): Event<TextDocument> {
     return this._onDocumentClosed.event
+  }
+
+  get onDidWatchedFileChanged (): Event<FileSystemWatcher[]> {
+    return this._onDidWatchedFileChanged.event
   }
 
   public get onWorkspaceApplyEdit (): RequestHandlerRegistration<ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, void> {
@@ -192,6 +197,9 @@ export class LanguageClient implements Disposable {
           }
         }
       }
+    })
+    this.serverCapabilities.onDidWatchedFileChanged((watchers) => {
+      this._onDidWatchedFileChanged.fire(watchers)
     })
 
     connection.sendNotification(InitializedNotification.type, {})
@@ -429,6 +437,19 @@ export class LanguageClient implements Disposable {
         text: includeText ? document.getText() : undefined
       })
     }
+  }
+
+  public notifyFileChanges (events: FileEvent[]): void {
+    const changes = events.filter(event => this.serverCapabilities!.isPathWatched(event.uri, event.type))
+    if (changes.length > 0) {
+      this.getServerConnection().sendNotification(DidChangeWatchedFilesNotification.type, {
+        changes
+      })
+    }
+  }
+
+  public getFileSystemWatchers (): FileSystemWatcher[] {
+    return this.serverCapabilities?.getFileSystemWatchers() ?? []
   }
 
   public getServerConnection (): rpc.MessageConnection {

@@ -1,6 +1,6 @@
 import fastDiff from 'fast-diff'
 import { InitializeParams } from 'vscode-languageserver'
-import { DocumentFilter, DocumentSelector, Position, RequestType, TextDocumentContentChangeEvent } from 'vscode-languageserver-protocol'
+import { DocumentFilter, DocumentSelector, FileChangeType, Position, RequestType, TextDocumentContentChangeEvent } from 'vscode-languageserver-protocol'
 import globToRegExp from 'glob-to-regexp'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { pathToFileURL } from 'url'
@@ -104,7 +104,7 @@ export function isRequestType<P, R> (type: RequestType<P, R, unknown>, request: 
   return request.method === type.method
 }
 
-function testGlob (pattern: string, value: string): boolean {
+export function testGlob (pattern: string, value: string): boolean {
   const regExp = globToRegExp(pattern, {
     extended: true,
     globstar: true
@@ -134,4 +134,12 @@ export function matchDocument (selector: string | DocumentFilter | DocumentSelec
     return true
   }
   return selector === document.languageId
+}
+
+export function matchFileSystemEventKind (kind: number, type: FileChangeType): boolean {
+  switch (type) {
+    case FileChangeType.Created: return (kind & 0b001) > 0
+    case FileChangeType.Changed: return (kind & 0b010) > 0
+    case FileChangeType.Deleted: return (kind & 0b100) > 0
+  }
 }

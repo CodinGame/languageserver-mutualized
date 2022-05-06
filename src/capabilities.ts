@@ -4,17 +4,18 @@ import {
   UnregistrationParams, UnregistrationRequest
 } from 'vscode-languageserver'
 import {
-  ClientCapabilities, DidChangeTextDocumentNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification,
+  ClientCapabilities, DidChangeTextDocumentNotification, DidChangeWatchedFilesNotification, DidCloseTextDocumentNotification, DidOpenTextDocumentNotification,
   DidSaveTextDocumentNotification,
+  FileChangeType,
+  FileSystemWatcher,
   ProtocolNotificationType,
-  ProtocolRequestType,
   SaveOptions,
   ServerCapabilities, TextDocumentRegistrationOptions, TextDocumentSaveRegistrationOptions, TextDocumentSyncKind, TextDocumentSyncOptions, WillSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, WorkspaceFoldersRequest
 } from 'vscode-languageserver-protocol'
 import * as rpc from '@codingame/monaco-jsonrpc'
 import winston from 'winston'
 import { TextDocument } from 'vscode-languageserver-textdocument'
-import { matchDocument } from './tools/lsp'
+import { matchDocument, matchFileSystemEventKind, testGlob } from './tools/lsp'
 
 export function isNumber (value: unknown): value is number {
   return typeof value === 'number' || value instanceof Number
@@ -154,6 +155,7 @@ export class WatchableServerCapabilities {
 
   private _onRegistrationRequest = new Emitter<RegistrationParams>()
   private _onUnregistrationRequest = new Emitter<UnregistrationParams>()
+  private _onDidWatchedFileChanged = new Emitter<FileSystemWatcher[]>()
 
   constructor (capabilities: ServerCapabilities<void>) {
     this.capabilities = capabilities
@@ -168,6 +170,10 @@ export class WatchableServerCapabilities {
     return this._onUnregistrationRequest.event
   }
 
+  get onDidWatchedFileChanged (): Event<FileSystemWatcher[]> {
+    return this._onDidWatchedFileChanged.event
+  }
+
   public handleRegistrationRequest (params: RegistrationParams): void {
     // Hack for C#
     const existingRegistrationIds = new Set(this.registrationRequests.map(r => r.id))
@@ -179,18 +185,24 @@ export class WatchableServerCapabilities {
         ...params,
         registrations
       })
+      if (registrations.some(registration => registration.method === DidChangeWatchedFilesNotification.type.method)) {
+        this._onDidWatchedFileChanged.fire(this.getFileSystemWatchers())
+      }
     }
   }
 
   public handleUnregistrationRequest (params: UnregistrationParams): void {
     const existingRegistrationIds = new Set(this.registrationRequests.map(r => r.id))
-    const removeRegistrations = params.unregisterations.filter(u => existingRegistrationIds.has(u.id))
-    const removeRegistrationIds = new Set(params.unregisterations.map(unregistration => unregistration.id))
-    this.registrationRequests = this.registrationRequests.filter(registration => !removeRegistrationIds.has(registration.id))
+    const removedRegistrations = params.unregisterations.filter(u => existingRegistrationIds.has(u.id))
+    const removedRegistrationIds = new Set(params.unregisterations.map(unregistration => unregistration.id))
+    this.registrationRequests = this.registrationRequests.filter(registration => !removedRegistrationIds.has(registration.id))
     this._onUnregistrationRequest.fire({
       ...params,
-      unregisterations: removeRegistrations
+      unregisterations: removedRegistrations
     })
+    if (removedRegistrations.some(registration => registration.method === DidChangeWatchedFilesNotification.type.method)) {
+      this._onDidWatchedFileChanged.fire(this.getFileSystemWatchers())
+    }
   }
 
   public getCapabilities (): ServerCapabilities<void> {
@@ -237,5 +249,26 @@ export class WatchableServerCapabilities {
         return option
       }
     }
+  }
+
+  public getFileSystemWatchers (): FileSystemWatcher[] {
+    return this.getDynamicRegistrationOptions(DidChangeWatchedFilesNotification.type).flatMap(options => options.watchers)
+  }
+
+  public isPathWatched (path: string, type: FileChangeType): boolean {
+    for (const watcher of this.getFileSystemWatchers()) {
+      if ((matchFileSystemEventKind(watcher.kind ?? 7, type)) && testGlob(watcher.globPattern, path)) {
+        return true
+      }
+    }
+    return false
+  }
+
+  public isUriWatched (uri: string, type: FileChangeType): boolean {
+    const url = new URL(uri)
+    if (url.protocol !== 'file') {
+      return false
+    }
+    return this.isPathWatched(url.pathname, type)
   }
 }
