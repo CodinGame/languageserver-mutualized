@@ -62,8 +62,19 @@ export function transformServerCapabilities<T> (serverCapabilities: ServerCapabi
   }
 }
 
-export function transformClientCapabilities (capabilities: ClientCapabilities): ClientCapabilities {
-  return capabilities
+export function transformClientCapabilities (clientCapabilities: ClientCapabilities, addDidWatchedCapabilities: boolean): ClientCapabilities {
+  return {
+    ...clientCapabilities,
+    workspace: {
+      ...(clientCapabilities.workspace ?? {}),
+      didChangeWatchedFiles: addDidWatchedCapabilities
+        ? {
+            dynamicRegistration: true,
+            relativePatternSupport: true
+          }
+        : undefined
+    }
+  }
 }
 
 export function adaptRegistration (registration: Registration): Registration {

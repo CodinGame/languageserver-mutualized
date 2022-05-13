@@ -20,7 +20,7 @@ import setValueBySection from 'set-value'
 import { DocumentUri, TextDocument } from 'vscode-languageserver-textdocument'
 import winston from 'winston'
 import debounce from 'debounce'
-import { WatchableServerCapabilities } from './capabilities'
+import { transformClientCapabilities, WatchableServerCapabilities } from './capabilities'
 import { lspDiff, matchDocument } from './tools/lsp'
 import { ConnectionRequestCache, createMemoizedConnection } from './tools/cache'
 import { allVoidMerger, MultiRequestHandler, RequestHandlerRegistration, singleHandlerMerger } from './tools/request-handler'
@@ -37,6 +37,7 @@ export interface LanguageClientOptions {
   synchronizeConfigurationSections?: string[]
   getConfiguration?: (key: string) => unknown
   disableSaveNotifications?: boolean
+  interceptDidChangeWatchedFile?: boolean
   createCache?: () => ConnectionRequestCache
   logger?: winston.Logger
   unhandledNotificationHandler?: (e: NotificationMessage) => void
@@ -185,7 +186,10 @@ export class LanguageClient implements Disposable {
       this._onDispose.fire(byRemote ? LanguageClientDisposeReason.Remote : LanguageClientDisposeReason.Local)
     })
 
-    const initializationResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
+    const initializationResult = await connection.sendRequest(InitializeRequest.type, {
+      ...initializeParams,
+      capabilities: transformClientCapabilities(initializeParams.capabilities, this.options.interceptDidChangeWatchedFile ?? false)
+    })
     this.serverCapabilities = new WatchableServerCapabilities(initializationResult.capabilities)
     this.serverCapabilities.onRegistrationRequest((request) => {
       for (const registration of request.registrations) {
@@ -452,6 +456,9 @@ export class LanguageClient implements Disposable {
   }
 
   public async notifyFileChanges (events: FileEvent[]): Promise<void> {
+    if (!(this.options.interceptDidChangeWatchedFile ?? false)) {
+      throw new Error('interceptDidChangeWatchedFile should be true to be able to notify file changes')
+    }
     const changes = events.filter(event => this.serverCapabilities!.isPathWatched(event.uri, event.type))
     if (changes.length > 0) {
       await this.getServerConnection().sendNotification(DidChangeWatchedFilesNotification.type, {
