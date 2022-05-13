@@ -180,6 +180,8 @@ function bindClientToServer (
         clientConnection.sendNotification(PublishDiagnosticsNotification.type, {
           uri: e.document.uri,
           diagnostics: existingDiagnostics
+        }).catch(error => {
+          options.logger?.error('Unable to send notification to client', error)
         })
       }
     })
@@ -192,7 +194,9 @@ function bindClientToServer (
 
     disposableCollection.push(languageClient.onDiagnostics(bindContext((diag) => {
       if (isDocumentOpen(diag.uri)) {
-        clientConnection.sendNotification(PublishDiagnosticsNotification.type, diag)
+        clientConnection.sendNotification(PublishDiagnosticsNotification.type, diag).catch(error => {
+          options.logger?.error('Unable to send notification to client', error)
+        })
       }
     })))
 
@@ -242,6 +246,8 @@ function bindClientToServer (
             uri: e.document.uri
           },
           reason: e.reason
+        }).catch(error => {
+          options.logger?.error('Unable to send notification to server', error)
         })
       })))
     }

@@ -193,7 +193,9 @@ export class LanguageClient implements Disposable {
           const options: TextDocumentRegistrationOptions = registration.registerOptions
           for (const document of this.currentDocuments.values()) {
             if (matchDocument(options.documentSelector, document)) {
-              this.sendDidOpenNotification(document)
+              this.sendDidOpenNotification(document).catch(error => {
+                this.options.logger?.error('Unable to send notification to server', error)
+              })
             }
           }
         }
@@ -203,7 +205,7 @@ export class LanguageClient implements Disposable {
       this._onDidWatchedFileChanged.fire(watchers)
     })
 
-    connection.sendNotification(InitializedNotification.type, {})
+    await connection.sendNotification(InitializedNotification.type, {})
 
     const synchronizeConfigurationSections = this.options.synchronizeConfigurationSections
     if (synchronizeConfigurationSections != null && synchronizeConfigurationSections.length > 0) {
@@ -212,7 +214,7 @@ export class LanguageClient implements Disposable {
         return config
       }, {})
 
-      connection.sendNotification(DidChangeConfigurationNotification.type, {
+      await connection.sendNotification(DidChangeConfigurationNotification.type, {
         settings: synchronizedConfiguration
       })
     }
@@ -224,9 +226,9 @@ export class LanguageClient implements Disposable {
     return this.logMessages
   }
 
-  private sendDidOpenNotification (document: TextDocument) {
+  private async sendDidOpenNotification (document: TextDocument) {
     const textDocumentItem = TextDocumentItem.create(document.uri, document.languageId, document.version, document.getText())
-    this.connection!.sendNotification(DidOpenTextDocumentNotification.type, {
+    await this.connection!.sendNotification(DidOpenTextDocumentNotification.type, {
       textDocument: textDocumentItem
     })
   }
@@ -239,7 +241,9 @@ export class LanguageClient implements Disposable {
     const newTextDocument = TextDocument.create(document.uri, document.languageId, 1, document.getText())
     this.currentDocuments.set(document.uri, newTextDocument)
     if (serverCapabilities.getTextDocumentNotificationOptions(DidOpenTextDocumentNotification.type, newTextDocument) != null) {
-      this.sendDidOpenNotification(newTextDocument)
+      this.sendDidOpenNotification(newTextDocument).catch(error => {
+        this.options.logger?.error('Unable to send notification to server', error)
+      })
     }
 
     this._onDocumentOpen.fire(newTextDocument)
@@ -305,6 +309,8 @@ export class LanguageClient implements Disposable {
           version: newDocument.version
         },
         contentChanges
+      }).catch(error => {
+        this.options.logger?.error('Unable to send notification to server', error)
       })
     }
 
@@ -328,6 +334,8 @@ export class LanguageClient implements Disposable {
     if (textDocumentCloseOptions != null) {
       serverConnection.sendNotification(DidCloseTextDocumentNotification.type, {
         textDocument: TextDocumentIdentifier.create(document.uri)
+      }).catch(error => {
+        this.options.logger?.error('Unable to send notification to server', error)
       })
     }
     this.lastDiagnostics.delete(document.uri)
@@ -384,22 +392,26 @@ export class LanguageClient implements Disposable {
 
     if (!(this.options.disableSaveNotifications ?? false)) {
       disposableCollection.push(documents.onDidSave(e => {
-        this.sendDidSaveNotification(e.document)
+        this.sendDidSaveNotification(e.document).catch(error => {
+          this.options.logger?.error('Unable to send notification to server', error)
+        })
       }))
       disposableCollection.push(documents.onWillSave(e => {
-        this.sendWillSaveNotification(e.document, e.reason)
+        this.sendWillSaveNotification(e.document, e.reason).catch(error => {
+          this.options.logger?.error('Unable to send notification to server', error)
+        })
       }))
     }
 
     return disposableCollection
   }
 
-  public sendWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): void {
+  public async sendWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentNotification.type, document)
     if (saveOptions != null) {
-      serverConnection.sendNotification(WillSaveTextDocumentNotification.type, {
+      await serverConnection.sendNotification(WillSaveTextDocumentNotification.type, {
         textDocument: {
           uri: document.uri
         },
@@ -424,13 +436,13 @@ export class LanguageClient implements Disposable {
     return null
   }
 
-  public sendDidSaveNotification (document: TextDocument): void {
+  public async sendDidSaveNotification (document: TextDocument): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(DidSaveTextDocumentNotification.type, document)
     if (saveOptions != null) {
       const includeText = saveOptions.includeText ?? false
-      serverConnection.sendNotification(DidSaveTextDocumentNotification.type, {
+      await serverConnection.sendNotification(DidSaveTextDocumentNotification.type, {
         textDocument: {
           uri: document.uri
         },
@@ -439,10 +451,10 @@ export class LanguageClient implements Disposable {
     }
   }
 
-  public notifyFileChanges (events: FileEvent[]): void {
+  public async notifyFileChanges (events: FileEvent[]): Promise<void> {
     const changes = events.filter(event => this.serverCapabilities!.isPathWatched(event.uri, event.type))
     if (changes.length > 0) {
-      this.getServerConnection().sendNotification(DidChangeWatchedFilesNotification.type, {
+      await this.getServerConnection().sendNotification(DidChangeWatchedFilesNotification.type, {
         changes
       })
     }
