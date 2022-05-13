@@ -1,4 +1,3 @@
-import { DisposableCollection } from '@codingame/monaco-jsonrpc'
 import {
   Disposable, Emitter, Event, Registration, RegistrationParams, RegistrationRequest, RegistrationType,
   UnregistrationParams, UnregistrationRequest
@@ -12,10 +11,11 @@ import {
   SaveOptions,
   ServerCapabilities, TextDocumentRegistrationOptions, TextDocumentSaveRegistrationOptions, TextDocumentSyncKind, TextDocumentSyncOptions, WillSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, WorkspaceFoldersRequest
 } from 'vscode-languageserver-protocol'
-import * as rpc from '@codingame/monaco-jsonrpc'
+import * as rpc from 'vscode-jsonrpc'
 import winston from 'winston'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { matchDocument, matchFileSystemEventKind, testGlob } from './tools/lsp'
+import { DisposableCollection } from './tools/disposable'
 
 export function isNumber (value: unknown): value is number {
   return typeof value === 'number' || value instanceof Number

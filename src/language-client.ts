@@ -1,4 +1,4 @@
-import * as rpc from '@codingame/monaco-jsonrpc'
+import * as rpc from 'vscode-jsonrpc'
 import {
   CodeLensRefreshRequest, InitializedNotification, InitializeRequest, PublishDiagnosticsNotification, RegistrationRequest,
   UnregistrationRequest, ConfigurationRequest, Event, SemanticTokensRefreshRequest, DidChangeConfigurationNotification,
@@ -15,7 +15,7 @@ import {
   TextDocumentSaveReason,
   WillSaveTextDocumentNotification
 } from 'vscode-languageserver/node'
-import { Emitter, ResponseError, ErrorCodes, Disposable, DisposableCollection, NotificationMessage } from '@codingame/monaco-jsonrpc'
+import { Emitter, ResponseError, ErrorCodes, Disposable, NotificationMessage } from 'vscode-jsonrpc'
 import setValueBySection from 'set-value'
 import { DocumentUri, TextDocument } from 'vscode-languageserver-textdocument'
 import winston from 'winston'
@@ -25,6 +25,7 @@ import { lspDiff, matchDocument } from './tools/lsp'
 import { ConnectionRequestCache, createMemoizedConnection } from './tools/cache'
 import { allVoidMerger, MultiRequestHandler, RequestHandlerRegistration, singleHandlerMerger } from './tools/request-handler'
 import { runWithTimeout } from './tools/node'
+import { DisposableCollection } from './tools/disposable'
 
 export enum LanguageClientDisposeReason {
   Remote,

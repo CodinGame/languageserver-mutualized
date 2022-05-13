@@ -1,5 +1,5 @@
-import * as rpc from '@codingame/monaco-jsonrpc'
-import { CancellationToken, MessageSignature } from '@codingame/monaco-jsonrpc'
+import * as rpc from 'vscode-jsonrpc'
+import { CancellationToken, MessageSignature } from 'vscode-jsonrpc'
 import objectHash from 'object-hash'
 import { forwardedClientRequests } from '../constants/lsp'
 

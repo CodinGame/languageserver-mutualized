@@ -1,4 +1,4 @@
-import * as rpc from '@codingame/monaco-jsonrpc'
+import * as rpc from 'vscode-jsonrpc'
 import {
   ClientCapabilities,
   CodeLensRefreshRequest,
@@ -20,7 +20,7 @@ import {
   ServerRequestHandler
 } from 'vscode-languageserver/lib/common/api'
 import { DocumentUri, TextDocument } from 'vscode-languageserver-textdocument'
-import { CancellationToken, Disposable, DisposableCollection, Emitter, HandlerResult } from '@codingame/monaco-jsonrpc'
+import { CancellationToken, Disposable, Emitter, HandlerResult } from 'vscode-jsonrpc'
 import ms from 'ms'
 import winston from 'winston'
 import { forwardedClientRequests } from './constants/lsp'
@@ -28,6 +28,7 @@ import { synchronizeLanguageServerCapabilities, transformServerCapabilities } fr
 import { BindContext, LanguageClient, LanguageClientDisposeReason } from './language-client'
 import pDefer from './tools/p-defer'
 import { timeout, TimeoutError } from './tools/promise'
+import { DisposableCollection } from './tools/disposable'
 
 export class ConnectionClosedError extends Error {
   constructor (message: string = 'Connection closed') {
