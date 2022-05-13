@@ -14,7 +14,7 @@ import {
 import * as rpc from 'vscode-jsonrpc'
 import winston from 'winston'
 import { TextDocument } from 'vscode-languageserver-textdocument'
-import { matchDocument, matchFileSystemEventKind, testGlob } from './tools/lsp'
+import { matchDocument, matchFileSystemEventKind, testGlobPattern } from './tools/lsp'
 import { DisposableCollection } from './tools/disposable'
 
 export function isNumber (value: unknown): value is number {
@@ -257,7 +257,7 @@ export class WatchableServerCapabilities {
 
   public isPathWatched (path: string, type: FileChangeType): boolean {
     for (const watcher of this.getFileSystemWatchers()) {
-      if ((matchFileSystemEventKind(watcher.kind ?? 7, type)) && testGlob(watcher.globPattern, path)) {
+      if ((matchFileSystemEventKind(watcher.kind ?? 7, type)) && testGlobPattern(watcher.globPattern, path)) {
         return true
       }
     }
