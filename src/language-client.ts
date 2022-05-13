@@ -467,7 +467,12 @@ export class LanguageClient implements Disposable {
     if (!(this.options.interceptDidChangeWatchedFile ?? false)) {
       throw new Error('interceptDidChangeWatchedFile should be true to be able to notify file changes')
     }
-    const changes = events.filter(event => this.serverCapabilities!.isPathWatched(event.uri, event.type))
+    const serverCapabilities = this.serverCapabilities
+    if (serverCapabilities == null) {
+      // The server is not started yet
+      return
+    }
+    const changes = events.filter(event => serverCapabilities.isPathWatched(event.uri, event.type))
     if (changes.length > 0) {
       await this.getServerConnection().sendNotification(DidChangeWatchedFilesNotification.type, {
         changes
