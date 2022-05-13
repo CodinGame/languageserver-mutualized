@@ -2,6 +2,7 @@ import * as rpc from 'vscode-jsonrpc'
 import {
   ClientCapabilities,
   CodeLensRefreshRequest,
+  DiagnosticRefreshRequest,
   DidChangeConfigurationNotification,
   InitializedNotification,
   InitializedParams,
@@ -213,13 +214,21 @@ function bindClientToServer (
     const sendSemanticTokensRefresh = bindContext(() => {
       if (semanticTokenRefreshSupport) {
         clientConnection.sendRequest(SemanticTokensRefreshRequest.type).catch(error => {
-          options.logger?.error('Unable to send Codelens token refresh to client', { error })
+          options.logger?.error('Unable to send semantic token refresh to client', { error })
+        })
+      }
+    })
+    const sendDiagnosticsRefresh = bindContext(() => {
+      if (semanticTokenRefreshSupport) {
+        clientConnection.sendRequest(DiagnosticRefreshRequest.type).catch(error => {
+          options.logger?.error('Unable to send Diagnostics refresh to client', { error })
         })
       }
     })
 
     disposableCollection.push(languageClient.onCodeLensRefresh(sendCodeLensRefresh))
     disposableCollection.push(languageClient.onSemanticTokensRefresh(sendSemanticTokensRefresh))
+    disposableCollection.push(languageClient.onSemanticTokensRefresh(sendDiagnosticsRefresh))
     disposableCollection.push(languageClient.onWorkspaceApplyEdit(bindContext(params => {
       return clientConnection.sendRequest(ApplyWorkspaceEditRequest.type, {
         label: params.label,
