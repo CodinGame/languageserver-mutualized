@@ -204,7 +204,6 @@ export class LanguageClient implements Disposable {
 
     connection.sendNotification(InitializedNotification.type, {})
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const synchronizeConfigurationSections = this.options.synchronizeConfigurationSections
     if (synchronizeConfigurationSections != null && synchronizeConfigurationSections.length > 0) {
       const synchronizedConfiguration = synchronizeConfigurationSections.reduce((config, section) => {
