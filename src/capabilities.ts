@@ -1,4 +1,3 @@
-import { DisposableCollection } from '@codingame/monaco-jsonrpc'
 import {
   Disposable, Emitter, Event, Registration, RegistrationParams, RegistrationRequest, RegistrationType,
   UnregistrationParams, UnregistrationRequest
@@ -12,10 +11,11 @@ import {
   SaveOptions,
   ServerCapabilities, TextDocumentRegistrationOptions, TextDocumentSaveRegistrationOptions, TextDocumentSyncKind, TextDocumentSyncOptions, WillSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, WorkspaceFoldersRequest
 } from 'vscode-languageserver-protocol'
-import * as rpc from '@codingame/monaco-jsonrpc'
+import * as rpc from 'vscode-jsonrpc'
 import winston from 'winston'
 import { TextDocument } from 'vscode-languageserver-textdocument'
-import { matchDocument, matchFileSystemEventKind, testGlob } from './tools/lsp'
+import { matchDocument, matchFileSystemEventKind, testGlobPattern } from './tools/lsp'
+import { DisposableCollection } from './tools/disposable'
 
 export function isNumber (value: unknown): value is number {
   return typeof value === 'number' || value instanceof Number
@@ -62,8 +62,19 @@ export function transformServerCapabilities<T> (serverCapabilities: ServerCapabi
   }
 }
 
-export function transformClientCapabilities (capabilities: ClientCapabilities): ClientCapabilities {
-  return capabilities
+export function transformClientCapabilities (clientCapabilities: ClientCapabilities, addDidWatchedCapabilities: boolean): ClientCapabilities {
+  return {
+    ...clientCapabilities,
+    workspace: {
+      ...(clientCapabilities.workspace ?? {}),
+      didChangeWatchedFiles: addDidWatchedCapabilities
+        ? {
+            dynamicRegistration: true,
+            relativePatternSupport: true
+          }
+        : undefined
+    }
+  }
 }
 
 export function adaptRegistration (registration: Registration): Registration {
@@ -257,7 +268,7 @@ export class WatchableServerCapabilities {
 
   public isPathWatched (path: string, type: FileChangeType): boolean {
     for (const watcher of this.getFileSystemWatchers()) {
-      if ((matchFileSystemEventKind(watcher.kind ?? 7, type)) && testGlob(watcher.globPattern, path)) {
+      if ((matchFileSystemEventKind(watcher.kind ?? 7, type)) && testGlobPattern(watcher.globPattern, path)) {
         return true
       }
     }

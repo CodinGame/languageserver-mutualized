@@ -1,11 +1,11 @@
-import * as rpc from '@codingame/monaco-jsonrpc'
+import * as rpc from 'vscode-jsonrpc'
 import {
   CodeLensRefreshRequest, InitializedNotification, InitializeRequest, PublishDiagnosticsNotification, RegistrationRequest,
   UnregistrationRequest, ConfigurationRequest, Event, SemanticTokensRefreshRequest, DidChangeConfigurationNotification,
   LogMessageNotification, WorkspaceFoldersRequest, WorkDoneProgressCreateRequest, ShutdownRequest, ShowMessageNotification,
   ShowMessageRequest, DidOpenTextDocumentNotification,
   DidCloseTextDocumentNotification, TextDocumentSyncKind, DidChangeTextDocumentNotification, ExecuteCommandRequest,
-  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions, DidChangeWatchedFilesNotification, FileSystemWatcher, FileEvent
+  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions, DidChangeWatchedFilesNotification, FileSystemWatcher, FileEvent, DiagnosticRefreshRequest
 } from 'vscode-languageserver-protocol'
 import {
   ApplyWorkspaceEditRequest,
@@ -15,16 +15,17 @@ import {
   TextDocumentSaveReason,
   WillSaveTextDocumentNotification
 } from 'vscode-languageserver/node'
-import { Emitter, ResponseError, ErrorCodes, Disposable, DisposableCollection, NotificationMessage } from '@codingame/monaco-jsonrpc'
+import { Emitter, ResponseError, ErrorCodes, Disposable, NotificationMessage } from 'vscode-jsonrpc'
 import setValueBySection from 'set-value'
 import { DocumentUri, TextDocument } from 'vscode-languageserver-textdocument'
 import winston from 'winston'
 import debounce from 'debounce'
-import { WatchableServerCapabilities } from './capabilities'
+import { transformClientCapabilities, WatchableServerCapabilities } from './capabilities'
 import { lspDiff, matchDocument } from './tools/lsp'
 import { ConnectionRequestCache, createMemoizedConnection } from './tools/cache'
 import { allVoidMerger, MultiRequestHandler, RequestHandlerRegistration, singleHandlerMerger } from './tools/request-handler'
 import { runWithTimeout } from './tools/node'
+import { DisposableCollection } from './tools/disposable'
 
 export enum LanguageClientDisposeReason {
   Remote,
@@ -36,6 +37,7 @@ export interface LanguageClientOptions {
   synchronizeConfigurationSections?: string[]
   getConfiguration?: (key: string) => unknown
   disableSaveNotifications?: boolean
+  interceptDidChangeWatchedFile?: boolean
   createCache?: () => ConnectionRequestCache
   logger?: winston.Logger
   unhandledNotificationHandler?: (e: NotificationMessage) => void
@@ -67,6 +69,7 @@ export class LanguageClient implements Disposable {
   private _onDiagnostics = new Emitter<PublishDiagnosticsParams>()
   private _onCodeLensRefresh = new MultiRequestHandler<void, void, void>(CodeLensRefreshRequest.type, allVoidMerger)
   private _onSemanticTokensRefresh = new MultiRequestHandler<void, void, void>(SemanticTokensRefreshRequest.type, allVoidMerger)
+  private _onDiagnosticsRefresh = new MultiRequestHandler<void, void, void>(DiagnosticRefreshRequest.type, allVoidMerger)
   private _workspaceApplyEditRequestHandler = new MultiRequestHandler(ApplyWorkspaceEditRequest.type, singleHandlerMerger({
     applied: false
   }))
@@ -122,6 +125,10 @@ export class LanguageClient implements Disposable {
     return this._onSemanticTokensRefresh.onRequest
   }
 
+  get onDiagnosticsRefresh (): RequestHandlerRegistration<void, void, void> {
+    return this._onDiagnosticsRefresh.onRequest
+  }
+
   private async startConnection (initializeParams: InitializeParams): Promise<rpc.MessageConnection> {
     const connection = this.cache != null ? createMemoizedConnection(this._connection, this.cache) : this._connection
     connection.onRequest(RegistrationRequest.type, (params) => {
@@ -140,6 +147,9 @@ export class LanguageClient implements Disposable {
     })
     connection.onRequest(SemanticTokensRefreshRequest.type, (token) => {
       return this._onSemanticTokensRefresh.sendRequest(undefined, token)
+    })
+    connection.onRequest(DiagnosticRefreshRequest.type, (token) => {
+      return this._onDiagnosticsRefresh.sendRequest(undefined, token)
     })
     connection.onRequest(ExecuteCommandRequest.type, (params) => {
       this.options.logger?.debug(`Ignored Execute command from server ${params.command}(${JSON.stringify(params.arguments)})`)
@@ -184,7 +194,10 @@ export class LanguageClient implements Disposable {
       this._onDispose.fire(byRemote ? LanguageClientDisposeReason.Remote : LanguageClientDisposeReason.Local)
     })
 
-    const initializationResult = await connection.sendRequest(InitializeRequest.type, initializeParams)
+    const initializationResult = await connection.sendRequest(InitializeRequest.type, {
+      ...initializeParams,
+      capabilities: transformClientCapabilities(initializeParams.capabilities, this.options.interceptDidChangeWatchedFile ?? false)
+    })
     this.serverCapabilities = new WatchableServerCapabilities(initializationResult.capabilities)
     this.serverCapabilities.onRegistrationRequest((request) => {
       for (const registration of request.registrations) {
@@ -192,7 +205,9 @@ export class LanguageClient implements Disposable {
           const options: TextDocumentRegistrationOptions = registration.registerOptions
           for (const document of this.currentDocuments.values()) {
             if (matchDocument(options.documentSelector, document)) {
-              this.sendDidOpenNotification(document)
+              this.sendDidOpenNotification(document).catch(error => {
+                this.options.logger?.error('Unable to send notification to server', error)
+              })
             }
           }
         }
@@ -202,7 +217,7 @@ export class LanguageClient implements Disposable {
       this._onDidWatchedFileChanged.fire(watchers)
     })
 
-    connection.sendNotification(InitializedNotification.type, {})
+    await connection.sendNotification(InitializedNotification.type, {})
 
     const synchronizeConfigurationSections = this.options.synchronizeConfigurationSections
     if (synchronizeConfigurationSections != null && synchronizeConfigurationSections.length > 0) {
@@ -211,7 +226,7 @@ export class LanguageClient implements Disposable {
         return config
       }, {})
 
-      connection.sendNotification(DidChangeConfigurationNotification.type, {
+      await connection.sendNotification(DidChangeConfigurationNotification.type, {
         settings: synchronizedConfiguration
       })
     }
@@ -223,9 +238,9 @@ export class LanguageClient implements Disposable {
     return this.logMessages
   }
 
-  private sendDidOpenNotification (document: TextDocument) {
+  private async sendDidOpenNotification (document: TextDocument) {
     const textDocumentItem = TextDocumentItem.create(document.uri, document.languageId, document.version, document.getText())
-    this.connection!.sendNotification(DidOpenTextDocumentNotification.type, {
+    await this.connection!.sendNotification(DidOpenTextDocumentNotification.type, {
       textDocument: textDocumentItem
     })
   }
@@ -238,7 +253,9 @@ export class LanguageClient implements Disposable {
     const newTextDocument = TextDocument.create(document.uri, document.languageId, 1, document.getText())
     this.currentDocuments.set(document.uri, newTextDocument)
     if (serverCapabilities.getTextDocumentNotificationOptions(DidOpenTextDocumentNotification.type, newTextDocument) != null) {
-      this.sendDidOpenNotification(newTextDocument)
+      this.sendDidOpenNotification(newTextDocument).catch(error => {
+        this.options.logger?.error('Unable to send notification to server', error)
+      })
     }
 
     this._onDocumentOpen.fire(newTextDocument)
@@ -304,6 +321,8 @@ export class LanguageClient implements Disposable {
           version: newDocument.version
         },
         contentChanges
+      }).catch(error => {
+        this.options.logger?.error('Unable to send notification to server', error)
       })
     }
 
@@ -327,6 +346,8 @@ export class LanguageClient implements Disposable {
     if (textDocumentCloseOptions != null) {
       serverConnection.sendNotification(DidCloseTextDocumentNotification.type, {
         textDocument: TextDocumentIdentifier.create(document.uri)
+      }).catch(error => {
+        this.options.logger?.error('Unable to send notification to server', error)
       })
     }
     this.lastDiagnostics.delete(document.uri)
@@ -383,22 +404,26 @@ export class LanguageClient implements Disposable {
 
     if (!(this.options.disableSaveNotifications ?? false)) {
       disposableCollection.push(documents.onDidSave(e => {
-        this.sendDidSaveNotification(e.document)
+        this.sendDidSaveNotification(e.document).catch(error => {
+          this.options.logger?.error('Unable to send notification to server', error)
+        })
       }))
       disposableCollection.push(documents.onWillSave(e => {
-        this.sendWillSaveNotification(e.document, e.reason)
+        this.sendWillSaveNotification(e.document, e.reason).catch(error => {
+          this.options.logger?.error('Unable to send notification to server', error)
+        })
       }))
     }
 
     return disposableCollection
   }
 
-  public sendWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): void {
+  public async sendWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentNotification.type, document)
     if (saveOptions != null) {
-      serverConnection.sendNotification(WillSaveTextDocumentNotification.type, {
+      await serverConnection.sendNotification(WillSaveTextDocumentNotification.type, {
         textDocument: {
           uri: document.uri
         },
@@ -423,13 +448,13 @@ export class LanguageClient implements Disposable {
     return null
   }
 
-  public sendDidSaveNotification (document: TextDocument): void {
+  public async sendDidSaveNotification (document: TextDocument): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(DidSaveTextDocumentNotification.type, document)
     if (saveOptions != null) {
       const includeText = saveOptions.includeText ?? false
-      serverConnection.sendNotification(DidSaveTextDocumentNotification.type, {
+      await serverConnection.sendNotification(DidSaveTextDocumentNotification.type, {
         textDocument: {
           uri: document.uri
         },
@@ -438,10 +463,13 @@ export class LanguageClient implements Disposable {
     }
   }
 
-  public notifyFileChanges (events: FileEvent[]): void {
+  public async notifyFileChanges (events: FileEvent[]): Promise<void> {
+    if (!(this.options.interceptDidChangeWatchedFile ?? false)) {
+      throw new Error('interceptDidChangeWatchedFile should be true to be able to notify file changes')
+    }
     const changes = events.filter(event => this.serverCapabilities!.isPathWatched(event.uri, event.type))
     if (changes.length > 0) {
-      this.getServerConnection().sendNotification(DidChangeWatchedFilesNotification.type, {
+      await this.getServerConnection().sendNotification(DidChangeWatchedFilesNotification.type, {
         changes
       })
     }

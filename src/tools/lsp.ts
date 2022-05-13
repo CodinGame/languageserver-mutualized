@@ -1,10 +1,9 @@
 import fastDiff from 'fast-diff'
 import { InitializeParams } from 'vscode-languageserver'
-import { DocumentFilter, DocumentSelector, FileChangeType, Position, RequestType, TextDocumentContentChangeEvent } from 'vscode-languageserver-protocol'
+import { DocumentFilter, DocumentSelector, FileChangeType, GlobPattern, Position, RelativePattern, RequestType, TextDocumentContentChangeEvent, TextDocumentFilter, URI } from 'vscode-languageserver-protocol'
 import globToRegExp from 'glob-to-regexp'
 import { TextDocument } from 'vscode-languageserver-textdocument'
-import { pathToFileURL } from 'url'
-
+import { pathToFileURL, URL } from 'url'
 interface Diff {
   offset: number
   length: number
@@ -112,6 +111,37 @@ export function testGlob (pattern: string, value: string): boolean {
   return regExp.test(value)
 }
 
+const sep = process.platform === 'win32' ? '\\' : '/'
+export function isEqualOrParent (base: string, parentCandidate: string, separator = sep): boolean {
+  if (base === parentCandidate) {
+    return true
+  }
+
+  if (parentCandidate.length > base.length) {
+    return false
+  }
+
+  if (parentCandidate.charAt(parentCandidate.length - 1) !== separator) {
+    parentCandidate += separator
+  }
+
+  return base.indexOf(parentCandidate) === 0
+}
+
+export function testGlobPattern (globPattern: GlobPattern, pathname: string): boolean {
+  if (RelativePattern.is(globPattern)) {
+    const uri = URI.is(globPattern.baseUri) ? globPattern.baseUri : globPattern.baseUri.uri
+    const parsedUrl = new URL(uri, 'http://lsp.codingame.com')
+    const parentPath = parsedUrl.pathname
+    if (!isEqualOrParent(pathname, parentPath)) {
+      return false
+    }
+    return testGlob(globPattern.pattern, pathname.substr(parentPath.length + 1))
+  } else {
+    return testGlob(globPattern, pathname)
+  }
+}
+
 export function matchDocument (selector: string | DocumentFilter | DocumentSelector | null, document: TextDocument): boolean {
   if (selector == null) {
     return true
@@ -119,7 +149,7 @@ export function matchDocument (selector: string | DocumentFilter | DocumentSelec
   if (Array.isArray(selector)) {
     return selector.some(filter => matchDocument(filter, document))
   }
-  if (DocumentFilter.is(selector)) {
+  if (TextDocumentFilter.is(selector)) {
     if (selector.language != null && selector.language !== document.languageId) {
       return false
     }
@@ -128,7 +158,7 @@ export function matchDocument (selector: string | DocumentFilter | DocumentSelec
     if (selector.scheme != null && selector.scheme !== scheme) {
       return false
     }
-    if (selector.pattern != null && !testGlob(selector.pattern, url.pathname)) {
+    if (selector.pattern != null && !testGlobPattern(selector.pattern, url.pathname)) {
       return false
     }
     return true

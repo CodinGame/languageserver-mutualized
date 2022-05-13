@@ -1,10 +1,10 @@
 import { SemanticTokensDeltaRequest, SemanticTokensRangeRequest } from 'vscode-languageserver'
 import {
   CodeActionRequest, CodeActionResolveRequest, CodeLensRequest, CodeLensResolveRequest, CompletionRequest,
-  CompletionResolveRequest, DefinitionRequest, DocumentColorRequest, DocumentFormattingRequest, DocumentHighlightRequest, DocumentLinkRequest,
+  CompletionResolveRequest, DefinitionRequest, DocumentColorRequest, DocumentDiagnosticRequest, DocumentFormattingRequest, DocumentHighlightRequest, DocumentLinkRequest,
   DocumentLinkResolveRequest, DocumentOnTypeFormattingRequest, DocumentRangeFormattingRequest, ExecuteCommandRequest,
   FoldingRangeRequest, HoverRequest, PrepareRenameRequest, ReferencesRequest, RenameRequest, RequestType, SemanticTokensRequest,
-  SignatureHelpRequest, WorkspaceSymbolRequest
+  SignatureHelpRequest, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest
 } from 'vscode-languageserver-protocol'
 
 export const forwardedClientRequests: RequestType<unknown, unknown, unknown>[] = [
@@ -33,5 +33,7 @@ export const forwardedClientRequests: RequestType<unknown, unknown, unknown>[] =
   DocumentLinkRequest.type,
   DocumentLinkResolveRequest.type,
   FoldingRangeRequest.type,
-  DocumentColorRequest.type
+  DocumentColorRequest.type,
+  WorkspaceDiagnosticRequest.type,
+  DocumentDiagnosticRequest.type
 ]
