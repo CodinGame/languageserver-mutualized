@@ -4,7 +4,7 @@ import {
   CompletionResolveRequest, DefinitionRequest, DocumentColorRequest, DocumentDiagnosticRequest, DocumentFormattingRequest, DocumentHighlightRequest, DocumentLinkRequest,
   DocumentLinkResolveRequest, DocumentOnTypeFormattingRequest, DocumentRangeFormattingRequest, ExecuteCommandRequest,
   FoldingRangeRequest, HoverRequest, PrepareRenameRequest, ReferencesRequest, RenameRequest, RequestType, SemanticTokensRequest,
-  SignatureHelpRequest, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest
+  SignatureHelpRequest, WorkspaceDiagnosticRequest, WorkspaceSymbolRequest, WorkspaceSymbolResolveRequest
 } from 'vscode-languageserver-protocol'
 
 export const forwardedClientRequests: RequestType<unknown, unknown, unknown>[] = [
@@ -35,5 +35,6 @@ export const forwardedClientRequests: RequestType<unknown, unknown, unknown>[] =
   FoldingRangeRequest.type,
   DocumentColorRequest.type,
   WorkspaceDiagnosticRequest.type,
-  DocumentDiagnosticRequest.type
+  DocumentDiagnosticRequest.type,
+  WorkspaceSymbolResolveRequest.type
 ]
