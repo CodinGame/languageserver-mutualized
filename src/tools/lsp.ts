@@ -1,6 +1,6 @@
 import fastDiff from 'fast-diff'
 import { InitializeParams } from 'vscode-languageserver'
-import { DocumentFilter, DocumentSelector, FileChangeType, Position, RequestType, TextDocumentContentChangeEvent } from 'vscode-languageserver-protocol'
+import { DocumentFilter, DocumentSelector, FileChangeType, Position, RequestType, TextDocumentContentChangeEvent, TextDocumentFilter } from 'vscode-languageserver-protocol'
 import globToRegExp from 'glob-to-regexp'
 import { TextDocument } from 'vscode-languageserver-textdocument'
 import { pathToFileURL } from 'url'
@@ -119,7 +119,7 @@ export function matchDocument (selector: string | DocumentFilter | DocumentSelec
   if (Array.isArray(selector)) {
     return selector.some(filter => matchDocument(filter, document))
   }
-  if (DocumentFilter.is(selector)) {
+  if (TextDocumentFilter.is(selector)) {
     if (selector.language != null && selector.language !== document.languageId) {
       return false
     }
