@@ -127,8 +127,8 @@ export class LanguageClient implements Disposable {
     return this._onSemanticTokensRefresh.onRequest
   }
 
-  get onDiagnosticsRefresh (): RequestHandlerRegistration<void, void, void> {
-    return this._onDiagnosticsRefresh.onRequest
+  get onDiagnosticRefresh (): RequestHandlerRegistration<void, void, void> {
+    return this._onDiagnosticRefresh.onRequest
   }
 
   get onInlayHintRefresh (): RequestHandlerRegistration<void, void, void> {
@@ -159,7 +159,7 @@ export class LanguageClient implements Disposable {
       return this._onSemanticTokensRefresh.sendRequest(undefined, token)
     })
     connection.onRequest(DiagnosticRefreshRequest.type, (token) => {
-      return this._onDiagnosticsRefresh.sendRequest(undefined, token)
+      return this._onDiagnosticRefresh.sendRequest(undefined, token)
     })
     connection.onRequest(InlayHintRefreshRequest.type, (token) => {
       return this._onInlayHintRefresh.sendRequest(undefined, token)

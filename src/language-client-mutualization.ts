@@ -217,7 +217,7 @@ function bindClientToServer (
         })
       }
     })))
-    disposableCollection.push(languageClient.onDiagnosticsRefresh(bindContext(() => {
+    disposableCollection.push(languageClient.onDiagnosticRefresh(bindContext(() => {
       if (clientCapabilities.workspace?.diagnostics?.refreshSupport ?? false) {
         clientConnection.sendRequest(DiagnosticRefreshRequest.type).catch(error => {
           options.logger?.error('Unable to send Diagnostics refresh to client', { error })
