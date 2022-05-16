@@ -6,6 +6,8 @@ import {
   DidChangeConfigurationNotification,
   InitializedNotification,
   InitializedParams,
+  InlayHintRefreshRequest,
+  InlineValueRefreshRequest,
   PublishDiagnosticsNotification,
   SemanticTokensRefreshRequest,
   TextDocumentSyncOptions,
@@ -201,35 +203,42 @@ function bindClientToServer (
       }
     })))
 
-    const codelensRefreshSupport = clientCapabilities.workspace?.codeLens?.refreshSupport ?? false
-    const sendCodeLensRefresh = bindContext(() => {
-      if (codelensRefreshSupport) {
+    disposableCollection.push(languageClient.onCodeLensRefresh(bindContext(() => {
+      if (clientCapabilities.workspace?.codeLens?.refreshSupport ?? false) {
         clientConnection.sendRequest(CodeLensRefreshRequest.type).catch(error => {
           options.logger?.error('Unable to send Codelens token refresh to client', { error })
         })
       }
-    })
-
-    const semanticTokenRefreshSupport = clientCapabilities.workspace?.semanticTokens?.refreshSupport ?? false
-    const sendSemanticTokensRefresh = bindContext(() => {
-      if (semanticTokenRefreshSupport) {
+    })))
+    disposableCollection.push(languageClient.onSemanticTokensRefresh(bindContext(() => {
+      if (clientCapabilities.workspace?.semanticTokens?.refreshSupport ?? false) {
         clientConnection.sendRequest(SemanticTokensRefreshRequest.type).catch(error => {
           options.logger?.error('Unable to send semantic token refresh to client', { error })
         })
       }
-    })
-    const diagnosticsRefreshSupport = clientCapabilities.workspace?.diagnostics?.refreshSupport ?? false
-    const sendDiagnosticsRefresh = bindContext(() => {
-      if (diagnosticsRefreshSupport) {
+    })))
+    disposableCollection.push(languageClient.onDiagnosticsRefresh(bindContext(() => {
+      if (clientCapabilities.workspace?.diagnostics?.refreshSupport ?? false) {
         clientConnection.sendRequest(DiagnosticRefreshRequest.type).catch(error => {
           options.logger?.error('Unable to send Diagnostics refresh to client', { error })
         })
       }
-    })
+    })))
+    disposableCollection.push(languageClient.onInlayHintRefresh(bindContext(() => {
+      if (clientCapabilities.workspace?.inlayHint?.refreshSupport ?? false) {
+        clientConnection.sendRequest(InlayHintRefreshRequest.type).catch(error => {
+          options.logger?.error('Unable to send Inlay Hint refresh to client', { error })
+        })
+      }
+    })))
+    disposableCollection.push(languageClient.onInlayHintRefresh(bindContext(() => {
+      if (clientCapabilities.workspace?.inlineValue?.refreshSupport ?? false) {
+        clientConnection.sendRequest(InlineValueRefreshRequest.type).catch(error => {
+          options.logger?.error('Unable to send Inline Value refresh to client', { error })
+        })
+      }
+    })))
 
-    disposableCollection.push(languageClient.onCodeLensRefresh(sendCodeLensRefresh))
-    disposableCollection.push(languageClient.onSemanticTokensRefresh(sendSemanticTokensRefresh))
-    disposableCollection.push(languageClient.onDiagnosticsRefresh(sendDiagnosticsRefresh))
     disposableCollection.push(languageClient.onWorkspaceApplyEdit(bindContext(params => {
       return clientConnection.sendRequest(ApplyWorkspaceEditRequest.type, {
         label: params.label,

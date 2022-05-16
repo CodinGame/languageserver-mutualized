@@ -70,6 +70,8 @@ export class LanguageClient implements Disposable {
   private _onCodeLensRefresh = new MultiRequestHandler<void, void, void>(CodeLensRefreshRequest.type, allVoidMerger)
   private _onSemanticTokensRefresh = new MultiRequestHandler<void, void, void>(SemanticTokensRefreshRequest.type, allVoidMerger)
   private _onDiagnosticsRefresh = new MultiRequestHandler<void, void, void>(DiagnosticRefreshRequest.type, allVoidMerger)
+  private _onInlayHintRefresh = new MultiRequestHandler<void, void, void>(InlayHintRefreshRequest.type, allVoidMerger)
+  private _onInlineValueRefresh = new MultiRequestHandler<void, void, void>(InlineValueRefreshRequest.type, allVoidMerger)
   private _workspaceApplyEditRequestHandler = new MultiRequestHandler(ApplyWorkspaceEditRequest.type, singleHandlerMerger({
     applied: false
   }))
@@ -129,6 +131,14 @@ export class LanguageClient implements Disposable {
     return this._onDiagnosticsRefresh.onRequest
   }
 
+  get onInlayHintRefresh (): RequestHandlerRegistration<void, void, void> {
+    return this._onInlayHintRefresh.onRequest
+  }
+
+  get onInlineValueRefresh (): RequestHandlerRegistration<void, void, void> {
+    return this._onInlineValueRefresh.onRequest
+  }
+
   private async startConnection (initializeParams: InitializeParams): Promise<rpc.MessageConnection> {
     const connection = this.cache != null ? createMemoizedConnection(this._connection, this.cache) : this._connection
     connection.onRequest(RegistrationRequest.type, (params) => {
@@ -150,6 +160,12 @@ export class LanguageClient implements Disposable {
     })
     connection.onRequest(DiagnosticRefreshRequest.type, (token) => {
       return this._onDiagnosticsRefresh.sendRequest(undefined, token)
+    })
+    connection.onRequest(InlayHintRefreshRequest.type, (token) => {
+      return this._onInlayHintRefresh.sendRequest(undefined, token)
+    })
+    connection.onRequest(InlineValueRefreshRequest.type, (token) => {
+      return this._onInlineValueRefresh.sendRequest(undefined, token)
     })
     connection.onRequest(ExecuteCommandRequest.type, (params) => {
       this.options.logger?.debug(`Ignored Execute command from server ${params.command}(${JSON.stringify(params.arguments)})`)
