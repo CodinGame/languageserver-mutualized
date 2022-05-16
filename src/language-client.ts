@@ -5,7 +5,7 @@ import {
   LogMessageNotification, WorkspaceFoldersRequest, WorkDoneProgressCreateRequest, ShutdownRequest, ShowMessageNotification,
   ShowMessageRequest, DidOpenTextDocumentNotification,
   DidCloseTextDocumentNotification, TextDocumentSyncKind, DidChangeTextDocumentNotification, ExecuteCommandRequest,
-  LogMessageParams, ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions, DidChangeWatchedFilesNotification, FileSystemWatcher, FileEvent, DiagnosticRefreshRequest
+  LogMessageParams, ApplyWorkspaceEditParams, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions, DidChangeWatchedFilesNotification, FileSystemWatcher, FileEvent, DiagnosticRefreshRequest, InlayHintRefreshRequest, InlineValueRefreshRequest, ApplyWorkspaceEditResult
 } from 'vscode-languageserver-protocol'
 import {
   ApplyWorkspaceEditRequest,
@@ -115,7 +115,7 @@ export class LanguageClient implements Disposable {
     return this._onDidWatchedFileChanged.event
   }
 
-  public get onWorkspaceApplyEdit (): RequestHandlerRegistration<ApplyWorkspaceEditParams, ApplyWorkspaceEditResponse, void> {
+  public get onWorkspaceApplyEdit (): RequestHandlerRegistration<ApplyWorkspaceEditParams, ApplyWorkspaceEditResult, void> {
     return this._workspaceApplyEditRequestHandler.onRequest
   }
 
