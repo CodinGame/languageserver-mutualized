@@ -218,8 +218,9 @@ function bindClientToServer (
         })
       }
     })
+    const diagnosticsRefreshSupport = clientCapabilities.workspace?.diagnostics?.refreshSupport ?? false
     const sendDiagnosticsRefresh = bindContext(() => {
-      if (semanticTokenRefreshSupport) {
+      if (diagnosticsRefreshSupport) {
         clientConnection.sendRequest(DiagnosticRefreshRequest.type).catch(error => {
           options.logger?.error('Unable to send Diagnostics refresh to client', { error })
         })
@@ -228,7 +229,7 @@ function bindClientToServer (
 
     disposableCollection.push(languageClient.onCodeLensRefresh(sendCodeLensRefresh))
     disposableCollection.push(languageClient.onSemanticTokensRefresh(sendSemanticTokensRefresh))
-    disposableCollection.push(languageClient.onSemanticTokensRefresh(sendDiagnosticsRefresh))
+    disposableCollection.push(languageClient.onDiagnosticsRefresh(sendDiagnosticsRefresh))
     disposableCollection.push(languageClient.onWorkspaceApplyEdit(bindContext(params => {
       return clientConnection.sendRequest(ApplyWorkspaceEditRequest.type, {
         label: params.label,
