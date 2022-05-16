@@ -10,6 +10,7 @@ import {
   InlineValueRefreshRequest,
   PublishDiagnosticsNotification,
   SemanticTokensRefreshRequest,
+  ShowDocumentRequest,
   TextDocumentSyncOptions,
   WillSaveTextDocumentNotification,
   WillSaveTextDocumentWaitUntilRequest
@@ -237,6 +238,10 @@ function bindClientToServer (
           options.logger?.error('Unable to send Inline Value refresh to client', { error })
         })
       }
+    })))
+
+    disposableCollection.push(languageClient.onShowDocument(bindContext(params => {
+      return clientConnection.sendRequest(ShowDocumentRequest.type, params)
     })))
 
     disposableCollection.push(languageClient.onWorkspaceApplyEdit(bindContext(params => {

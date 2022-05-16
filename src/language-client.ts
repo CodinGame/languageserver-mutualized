@@ -5,7 +5,7 @@ import {
   LogMessageNotification, WorkspaceFoldersRequest, WorkDoneProgressCreateRequest, ShutdownRequest, ShowMessageNotification,
   ShowMessageRequest, DidOpenTextDocumentNotification,
   DidCloseTextDocumentNotification, TextDocumentSyncKind, DidChangeTextDocumentNotification, ExecuteCommandRequest,
-  LogMessageParams, ApplyWorkspaceEditParams, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions, DidChangeWatchedFilesNotification, FileSystemWatcher, FileEvent, DiagnosticRefreshRequest, InlayHintRefreshRequest, InlineValueRefreshRequest, ApplyWorkspaceEditResult
+  LogMessageParams, ApplyWorkspaceEditParams, Diagnostic, TextDocumentItem, DidSaveTextDocumentNotification, WillSaveTextDocumentWaitUntilRequest, TextDocumentIdentifier, TextEdit, TextDocumentRegistrationOptions, DidChangeWatchedFilesNotification, FileSystemWatcher, FileEvent, DiagnosticRefreshRequest, InlayHintRefreshRequest, InlineValueRefreshRequest, ApplyWorkspaceEditResult, ShowDocumentRequest, ShowDocumentParams, ShowDocumentResult
 } from 'vscode-languageserver-protocol'
 import {
   ApplyWorkspaceEditRequest,
@@ -69,9 +69,15 @@ export class LanguageClient implements Disposable {
   private _onDiagnostics = new Emitter<PublishDiagnosticsParams>()
   private _onCodeLensRefresh = new MultiRequestHandler<void, void, void>(CodeLensRefreshRequest.type, allVoidMerger)
   private _onSemanticTokensRefresh = new MultiRequestHandler<void, void, void>(SemanticTokensRefreshRequest.type, allVoidMerger)
-  private _onDiagnosticsRefresh = new MultiRequestHandler<void, void, void>(DiagnosticRefreshRequest.type, allVoidMerger)
+  private _onDiagnosticRefresh = new MultiRequestHandler<void, void, void>(DiagnosticRefreshRequest.type, allVoidMerger)
   private _onInlayHintRefresh = new MultiRequestHandler<void, void, void>(InlayHintRefreshRequest.type, allVoidMerger)
   private _onInlineValueRefresh = new MultiRequestHandler<void, void, void>(InlineValueRefreshRequest.type, allVoidMerger)
+  private _onShowDocument = new MultiRequestHandler(ShowDocumentRequest.type, results => {
+    return {
+      success: results.every(result => (!(result instanceof Error) && result?.success) ?? false)
+    }
+  })
+
   private _workspaceApplyEditRequestHandler = new MultiRequestHandler(ApplyWorkspaceEditRequest.type, singleHandlerMerger({
     applied: false
   }))
@@ -139,6 +145,10 @@ export class LanguageClient implements Disposable {
     return this._onInlineValueRefresh.onRequest
   }
 
+  get onShowDocument (): RequestHandlerRegistration<ShowDocumentParams, ShowDocumentResult, void> {
+    return this._onShowDocument.onRequest
+  }
+
   private async startConnection (initializeParams: InitializeParams): Promise<rpc.MessageConnection> {
     const connection = this.cache != null ? createMemoizedConnection(this._connection, this.cache) : this._connection
     connection.onRequest(RegistrationRequest.type, (params) => {
@@ -166,6 +176,9 @@ export class LanguageClient implements Disposable {
     })
     connection.onRequest(InlineValueRefreshRequest.type, (token) => {
       return this._onInlineValueRefresh.sendRequest(undefined, token)
+    })
+    connection.onRequest(ShowDocumentRequest.type, (params, token) => {
+      return this._onShowDocument.sendRequest(params, token)
     })
     connection.onRequest(ExecuteCommandRequest.type, (params) => {
       this.options.logger?.debug(`Ignored Execute command from server ${params.command}(${JSON.stringify(params.arguments)})`)
