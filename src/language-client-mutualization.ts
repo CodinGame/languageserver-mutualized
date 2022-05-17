@@ -232,7 +232,7 @@ function bindClientToServer (
         })
       }
     })))
-    disposableCollection.push(languageClient.onInlayHintRefresh(bindContext(() => {
+    disposableCollection.push(languageClient.onInlineValueRefresh(bindContext(() => {
       if (clientCapabilities.workspace?.inlineValue?.refreshSupport ?? false) {
         clientConnection.sendRequest(InlineValueRefreshRequest.type).catch(error => {
           options.logger?.error('Unable to send Inline Value refresh to client', { error })
