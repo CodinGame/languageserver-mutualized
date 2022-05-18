@@ -6,8 +6,11 @@ import {
   DidChangeConfigurationNotification,
   InitializedNotification,
   InitializedParams,
+  InlayHintRefreshRequest,
+  InlineValueRefreshRequest,
   PublishDiagnosticsNotification,
   SemanticTokensRefreshRequest,
+  ShowDocumentRequest,
   TextDocumentSyncOptions,
   WillSaveTextDocumentNotification,
   WillSaveTextDocumentWaitUntilRequest
@@ -201,34 +204,36 @@ function bindClientToServer (
       }
     })))
 
-    const codelensRefreshSupport = clientCapabilities.workspace?.codeLens?.refreshSupport ?? false
-    const sendCodeLensRefresh = bindContext(() => {
-      if (codelensRefreshSupport) {
-        clientConnection.sendRequest(CodeLensRefreshRequest.type).catch(error => {
-          options.logger?.error('Unable to send Codelens token refresh to client', { error })
-        })
-      }
-    })
+    disposableCollection.push(languageClient.onCodeLensRefresh(bindContext(() => {
+      clientConnection.sendRequest(CodeLensRefreshRequest.type).catch(error => {
+        options.logger?.error('Unable to send Codelens token refresh to client', { error })
+      })
+    })))
+    disposableCollection.push(languageClient.onSemanticTokensRefresh(bindContext(() => {
+      clientConnection.sendRequest(SemanticTokensRefreshRequest.type).catch(error => {
+        options.logger?.error('Unable to send semantic token refresh to client', { error })
+      })
+    })))
+    disposableCollection.push(languageClient.onDiagnosticRefresh(bindContext(() => {
+      clientConnection.sendRequest(DiagnosticRefreshRequest.type).catch(error => {
+        options.logger?.error('Unable to send Diagnostics refresh to client', { error })
+      })
+    })))
+    disposableCollection.push(languageClient.onInlayHintRefresh(bindContext(() => {
+      clientConnection.sendRequest(InlayHintRefreshRequest.type).catch(error => {
+        options.logger?.error('Unable to send Inlay Hint refresh to client', { error })
+      })
+    })))
+    disposableCollection.push(languageClient.onInlineValueRefresh(bindContext(() => {
+      clientConnection.sendRequest(InlineValueRefreshRequest.type).catch(error => {
+        options.logger?.error('Unable to send Inline Value refresh to client', { error })
+      })
+    })))
 
-    const semanticTokenRefreshSupport = clientCapabilities.workspace?.semanticTokens?.refreshSupport ?? false
-    const sendSemanticTokensRefresh = bindContext(() => {
-      if (semanticTokenRefreshSupport) {
-        clientConnection.sendRequest(SemanticTokensRefreshRequest.type).catch(error => {
-          options.logger?.error('Unable to send semantic token refresh to client', { error })
-        })
-      }
-    })
-    const sendDiagnosticsRefresh = bindContext(() => {
-      if (semanticTokenRefreshSupport) {
-        clientConnection.sendRequest(DiagnosticRefreshRequest.type).catch(error => {
-          options.logger?.error('Unable to send Diagnostics refresh to client', { error })
-        })
-      }
-    })
+    disposableCollection.push(languageClient.onShowDocument(bindContext(params => {
+      return clientConnection.sendRequest(ShowDocumentRequest.type, params)
+    })))
 
-    disposableCollection.push(languageClient.onCodeLensRefresh(sendCodeLensRefresh))
-    disposableCollection.push(languageClient.onSemanticTokensRefresh(sendSemanticTokensRefresh))
-    disposableCollection.push(languageClient.onSemanticTokensRefresh(sendDiagnosticsRefresh))
     disposableCollection.push(languageClient.onWorkspaceApplyEdit(bindContext(params => {
       return clientConnection.sendRequest(ApplyWorkspaceEditRequest.type, {
         label: params.label,
