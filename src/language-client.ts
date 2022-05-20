@@ -439,6 +439,11 @@ export class LanguageClient implements Disposable {
           this.options.logger?.error('Unable to send notification to server', error)
         })
       }))
+      documents.onWillSaveWaitUntil(async (e, token) => {
+        return (await this.sendWillSaveWaitUntil(e.document, e.reason, token).catch(error => {
+          this.options.logger?.error('Unable to send notification to server', error)
+        })) ?? []
+      })
       disposableCollection.push(documents.onWillSave(e => {
         this.sendWillSaveNotification(e.document, e.reason).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
@@ -463,7 +468,7 @@ export class LanguageClient implements Disposable {
     }
   }
 
-  public async sendWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason): Promise<TextEdit[] | null> {
+  public async sendWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const willSaveWaitUntilOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentWaitUntilRequest.type, document)
@@ -473,7 +478,7 @@ export class LanguageClient implements Disposable {
           uri: document.uri
         },
         reason
-      })
+      }, token)
     }
 
     return null
