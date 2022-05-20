@@ -63,7 +63,6 @@ export class LanguageClient implements Disposable {
   private serverCapabilities: WatchableServerCapabilities | undefined
   private connectionPromise: Promise<rpc.MessageConnection> | undefined
   private connection: rpc.MessageConnection | undefined
-  private ready: boolean
   private _onDispose = new Emitter<LanguageClientDisposeReason>()
   private lastDiagnostics = new Map<string, Diagnostic[]>()
   private _onDiagnostics = new Emitter<PublishDiagnosticsParams>()
@@ -92,7 +91,6 @@ export class LanguageClient implements Disposable {
     private _connection: rpc.MessageConnection,
     public readonly options: LanguageClientOptions
   ) {
-    this.ready = false
     this.logMessages = []
     this.cache = options.createCache?.()
   }
@@ -529,10 +527,6 @@ export class LanguageClient implements Disposable {
       }
     }
     this.connection = await this.connectionPromise
-  }
-
-  public isReady (): boolean {
-    return this.ready
   }
 
   public getConnection (): Promise<rpc.MessageConnection> {
