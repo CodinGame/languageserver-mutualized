@@ -206,6 +206,8 @@ export class LanguageClient implements Disposable {
     })
     connection.onUnhandledNotification(this.options.unhandledNotificationHandler ?? (() => null))
     connection.onUnhandledProgress(() => {})
+
+    // We've binded every requests we need, so display any other request as an error
     connection.onRequest((method, params) => {
       this.options.logger?.error(`Unhandled request: ${method}, params: ${JSON.stringify(params)}`)
       throw new ResponseError(ErrorCodes.MethodNotFound, `Unhandled method ${method}`)
@@ -226,6 +228,8 @@ export class LanguageClient implements Disposable {
       capabilities: transformClientCapabilities(initializeParams.capabilities, this.options.interceptDidChangeWatchedFile ?? false)
     })
     this.serverCapabilities = new WatchableServerCapabilities(initializationResult.capabilities)
+
+    // If the server did register a didOpen capability, we need to send a didOpen notification for every open document
     this.serverCapabilities.onRegistrationRequest((request) => {
       for (const registration of request.registrations) {
         if (registration.method === DidOpenTextDocumentNotification.method) {
