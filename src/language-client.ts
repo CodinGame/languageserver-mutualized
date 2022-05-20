@@ -519,14 +519,16 @@ export class LanguageClient implements Disposable {
     if (this.connectionPromise == null) {
       this.connectionPromise = this.startConnection(initializeParams)
       try {
-        await this.connectionPromise
+        this.connection = await this.connectionPromise
       } catch (err) {
+        this.connectionPromise = undefined
         this.disposed = true
         this._onDispose.fire(LanguageClientDisposeReason.Local)
         throw err
       }
+    } else {
+      await this.connectionPromise
     }
-    this.connection = await this.connectionPromise
   }
 
   public getConnection (): Promise<rpc.MessageConnection> {
