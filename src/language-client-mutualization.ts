@@ -253,30 +253,6 @@ function bindClientToServer (
       })
     })))
 
-    if ((serverCapabilities.getCapabilities().textDocumentSync as TextDocumentSyncOptions | undefined)?.willSave ?? false) {
-      disposableCollection.push(documents.onWillSave(bindContext(async e => {
-        serverConnection.sendNotification(WillSaveTextDocumentNotification.type, {
-          textDocument: {
-            uri: e.document.uri
-          },
-          reason: e.reason
-        }).catch(error => {
-          options.logger?.error('Unable to send notification to server', error)
-        })
-      })))
-    }
-
-    if (!(languageClient.options.disableSaveNotifications ?? false)) {
-      documents.onWillSaveWaitUntil(bindContext(async (e, token) => {
-        return await serverConnection.sendRequest(WillSaveTextDocumentWaitUntilRequest.type, {
-          textDocument: {
-            uri: e.document.uri
-          },
-          reason: e.reason
-        }, token) ?? []
-      }))
-    }
-
     for (const request of forwardedClientRequests) {
       disposableCollection.push(clientConnection.onRequest(request, bindContext(async (params, token) => {
         onRequestEmitter.fire()

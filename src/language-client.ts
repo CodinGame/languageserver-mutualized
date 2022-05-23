@@ -63,7 +63,6 @@ export class LanguageClient implements Disposable {
   private serverCapabilities: WatchableServerCapabilities | undefined
   private connectionPromise: Promise<rpc.MessageConnection> | undefined
   private connection: rpc.MessageConnection | undefined
-  private ready: boolean
   private _onDispose = new Emitter<LanguageClientDisposeReason>()
   private lastDiagnostics = new Map<string, Diagnostic[]>()
   private _onDiagnostics = new Emitter<PublishDiagnosticsParams>()
@@ -92,7 +91,6 @@ export class LanguageClient implements Disposable {
     private _connection: rpc.MessageConnection,
     public readonly options: LanguageClientOptions
   ) {
-    this.ready = false
     this.logMessages = []
     this.cache = options.createCache?.()
   }
@@ -208,6 +206,8 @@ export class LanguageClient implements Disposable {
     })
     connection.onUnhandledNotification(this.options.unhandledNotificationHandler ?? (() => null))
     connection.onUnhandledProgress(() => {})
+
+    // We've binded every requests we need, so display any other request as an error
     connection.onRequest((method, params) => {
       this.options.logger?.error(`Unhandled request: ${method}, params: ${JSON.stringify(params)}`)
       throw new ResponseError(ErrorCodes.MethodNotFound, `Unhandled method ${method}`)
@@ -228,6 +228,8 @@ export class LanguageClient implements Disposable {
       capabilities: transformClientCapabilities(initializeParams.capabilities, this.options.interceptDidChangeWatchedFile ?? false)
     })
     this.serverCapabilities = new WatchableServerCapabilities(initializationResult.capabilities)
+
+    // If the server did register a didOpen capability, we need to send a didOpen notification for every open document
     this.serverCapabilities.onRegistrationRequest((request) => {
       for (const registration of request.registrations) {
         if (registration.method === DidOpenTextDocumentNotification.method) {
@@ -437,6 +439,11 @@ export class LanguageClient implements Disposable {
           this.options.logger?.error('Unable to send notification to server', error)
         })
       }))
+      documents.onWillSaveWaitUntil(async (e, token) => {
+        return (await this.sendWillSaveWaitUntil(e.document, e.reason, token).catch(error => {
+          this.options.logger?.error('Unable to send notification to server', error)
+        })) ?? []
+      })
       disposableCollection.push(documents.onWillSave(e => {
         this.sendWillSaveNotification(e.document, e.reason).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
@@ -461,7 +468,7 @@ export class LanguageClient implements Disposable {
     }
   }
 
-  public async sendWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason): Promise<TextEdit[] | null> {
+  public async sendWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const willSaveWaitUntilOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentWaitUntilRequest.type, document)
@@ -471,7 +478,7 @@ export class LanguageClient implements Disposable {
           uri: document.uri
         },
         reason
-      })
+      }, token)
     }
 
     return null
@@ -521,18 +528,16 @@ export class LanguageClient implements Disposable {
     if (this.connectionPromise == null) {
       this.connectionPromise = this.startConnection(initializeParams)
       try {
-        await this.connectionPromise
+        this.connection = await this.connectionPromise
       } catch (err) {
+        this.connectionPromise = undefined
         this.disposed = true
         this._onDispose.fire(LanguageClientDisposeReason.Local)
         throw err
       }
+    } else {
+      await this.connectionPromise
     }
-    this.connection = await this.connectionPromise
-  }
-
-  public isReady (): boolean {
-    return this.ready
   }
 
   public getConnection (): Promise<rpc.MessageConnection> {
