@@ -435,7 +435,7 @@ export class LanguageClient implements Disposable {
 
     if (!(this.options.disableSaveNotifications ?? false)) {
       disposableCollection.push(documents.onDidSave(e => {
-        this.sendDocumentDidSaveNotification(e.document).catch(error => {
+        this.sendDocumentDidSaveNotification(e.document, e.document.getText()).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
         })
       }))
@@ -502,7 +502,7 @@ export class LanguageClient implements Disposable {
     }
   }
 
-  private async sendDocumentDidSaveNotification (document: TextDocument): Promise<void> {
+  private async sendDocumentDidSaveNotification (document: TextDocument, text: string): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(DidSaveTextDocumentNotification.type, document)
@@ -512,17 +512,17 @@ export class LanguageClient implements Disposable {
         textDocument: {
           uri: document.uri
         },
-        text: includeText ? document.getText() : undefined
+        text: includeText ? text : undefined
       })
     }
   }
 
-  public async sendDidSaveNotification (uri: string): Promise<void> {
+  public async sendDidSaveNotification (uri: string, text: string): Promise<void> {
     const document = this.currentDocuments.get(uri)
     if (document == null) {
       throw new Error('sendDidSaveNotification called for an unknown document')
     } else {
-      return await this.sendDocumentDidSaveNotification(document)
+      return await this.sendDocumentDidSaveNotification(document, text)
     }
   }
 
