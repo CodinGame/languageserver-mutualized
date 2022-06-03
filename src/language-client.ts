@@ -435,17 +435,17 @@ export class LanguageClient implements Disposable {
 
     if (!(this.options.disableSaveNotifications ?? false)) {
       disposableCollection.push(documents.onDidSave(e => {
-        this.sendDidSaveNotification(e.document).catch(error => {
+        this.sendDocumentDidSaveNotification(e.document).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
         })
       }))
       documents.onWillSaveWaitUntil(async (e, token) => {
-        return (await this.sendWillSaveWaitUntil(e.document, e.reason, token).catch(error => {
+        return (await this.sendDocumentWillSaveWaitUntil(e.document, e.reason, token).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
         })) ?? []
       })
       disposableCollection.push(documents.onWillSave(e => {
-        this.sendWillSaveNotification(e.document, e.reason).catch(error => {
+        this.sendDocumentWillSaveNotification(e.document, e.reason).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
         })
       }))
@@ -454,7 +454,7 @@ export class LanguageClient implements Disposable {
     return disposableCollection
   }
 
-  public async sendWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): Promise<void> {
+  private async sendDocumentWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentNotification.type, document)
@@ -468,7 +468,16 @@ export class LanguageClient implements Disposable {
     }
   }
 
-  public async sendWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
+  public async sendWillSaveNotification (uri: string, reason: TextDocumentSaveReason): Promise<void> {
+    const document = this.currentDocuments.get(uri)
+    if (document == null) {
+      throw new Error('sendWillSaveNotification called for an unknown document')
+    } else {
+      return await this.sendDocumentWillSaveNotification(document, reason)
+    }
+  }
+
+  private async sendDocumentWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const willSaveWaitUntilOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentWaitUntilRequest.type, document)
@@ -484,7 +493,16 @@ export class LanguageClient implements Disposable {
     return null
   }
 
-  public async sendDidSaveNotification (document: TextDocument): Promise<void> {
+  public async sendWillSaveWaitUntil (uri: string, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
+    const document = this.currentDocuments.get(uri)
+    if (document == null) {
+      throw new Error('sendWillSaveWaitUntil called for an unknown document')
+    } else {
+      return await this.sendDocumentWillSaveWaitUntil(document, reason, token)
+    }
+  }
+
+  private async sendDocumentDidSaveNotification (document: TextDocument): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(DidSaveTextDocumentNotification.type, document)
@@ -496,6 +514,15 @@ export class LanguageClient implements Disposable {
         },
         text: includeText ? document.getText() : undefined
       })
+    }
+  }
+
+  public async sendDidSaveNotification (uri: string): Promise<void> {
+    const document = this.currentDocuments.get(uri)
+    if (document == null) {
+      throw new Error('sendDidSaveNotification called for an unknown document')
+    } else {
+      return await this.sendDocumentDidSaveNotification(document)
     }
   }
 
