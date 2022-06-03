@@ -374,7 +374,7 @@ export class LanguageClient implements Disposable {
     const serverCapabilities = this.serverCapabilities!
     const textDocumentCloseOptions = serverCapabilities.getTextDocumentNotificationOptions(DidCloseTextDocumentNotification.type, currentDocument)
     const serverConnection = this.connection!
-    if (textDocumentCloseOptions != null) {
+    if (textDocumentCloseOptions != null && !this.isDisposed()) {
       serverConnection.sendNotification(DidCloseTextDocumentNotification.type, {
         textDocument: TextDocumentIdentifier.create(document.uri)
       }).catch(error => {
