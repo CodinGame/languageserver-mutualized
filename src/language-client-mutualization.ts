@@ -1,6 +1,5 @@
 import * as rpc from 'vscode-jsonrpc'
 import {
-  ClientCapabilities,
   CodeLensRefreshRequest,
   DiagnosticRefreshRequest,
   DidChangeConfigurationNotification,
@@ -10,10 +9,7 @@ import {
   InlineValueRefreshRequest,
   PublishDiagnosticsNotification,
   SemanticTokensRefreshRequest,
-  ShowDocumentRequest,
-  TextDocumentSyncOptions,
-  WillSaveTextDocumentNotification,
-  WillSaveTextDocumentWaitUntilRequest
+  ShowDocumentRequest
 } from 'vscode-languageserver-protocol'
 import {
   TextDocuments,
@@ -124,6 +120,8 @@ export async function bindLanguageClient (
     await languageClient.start(initParams)
     const serverConnection = await languageClient.getConnection()
 
+    // disposed can actually be set to false asynchronously
+    // eslint-disable-next-line @typescript-eslint/no-unnecessary-condition
     if (disposed) {
       throw new ConnectionClosedError()
     }
@@ -133,7 +131,6 @@ export async function bindLanguageClient (
       languageClient,
       serverConnection,
       clientMessageConnection,
-      initParams.capabilities,
       options
     ))
 
@@ -169,13 +166,10 @@ function bindClientToServer (
   languageClient: LanguageClient,
   serverConnection: rpc.MessageConnection,
   clientConnection: rpc.MessageConnection,
-  clientCapabilities: ClientCapabilities,
   options: LanguageClientBindingOptions
 ): Disposable {
   const disposableCollection = new DisposableCollection()
   try {
-    const serverCapabilities = languageClient.getServerCapabilities()
-
     const onRequestEmitter = new Emitter<void>()
     disposableCollection.push(languageClient.synchronize(documents, onRequestEmitter.event))
     documents.onDidOpen((e) => {
