@@ -470,10 +470,8 @@ export class LanguageClient implements Disposable {
 
   public async sendWillSaveNotification (uri: string, reason: TextDocumentSaveReason): Promise<void> {
     const document = this.currentDocuments.get(uri)
-    if (document == null) {
-      throw new Error('sendWillSaveNotification called for an unknown document')
-    } else {
-      return await this.sendDocumentWillSaveNotification(document, reason)
+    if (document != null) {
+      await this.sendDocumentWillSaveNotification(document, reason)
     }
   }
 
@@ -495,10 +493,10 @@ export class LanguageClient implements Disposable {
 
   public async sendWillSaveWaitUntil (uri: string, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
     const document = this.currentDocuments.get(uri)
-    if (document == null) {
-      throw new Error('sendWillSaveWaitUntil called for an unknown document')
-    } else {
+    if (document != null) {
       return await this.sendDocumentWillSaveWaitUntil(document, reason, token)
+    } else {
+      return null
     }
   }
 
@@ -519,10 +517,8 @@ export class LanguageClient implements Disposable {
 
   public async sendDidSaveNotification (uri: string, text: string): Promise<void> {
     const document = this.currentDocuments.get(uri)
-    if (document == null) {
-      throw new Error('sendDidSaveNotification called for an unknown document')
-    } else {
-      return await this.sendDocumentDidSaveNotification(document, text)
+    if (document != null) {
+      await this.sendDocumentDidSaveNotification(document, text)
     }
   }
 
