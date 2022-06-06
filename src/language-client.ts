@@ -435,17 +435,17 @@ export class LanguageClient implements Disposable {
 
     if (!(this.options.disableSaveNotifications ?? false)) {
       disposableCollection.push(documents.onDidSave(e => {
-        this.sendDidSaveNotification(e.document).catch(error => {
+        this.sendDocumentDidSaveNotification(e.document, e.document.getText()).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
         })
       }))
       documents.onWillSaveWaitUntil(async (e, token) => {
-        return (await this.sendWillSaveWaitUntil(e.document, e.reason, token).catch(error => {
+        return (await this.sendDocumentWillSaveWaitUntil(e.document, e.reason, token).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
         })) ?? []
       })
       disposableCollection.push(documents.onWillSave(e => {
-        this.sendWillSaveNotification(e.document, e.reason).catch(error => {
+        this.sendDocumentWillSaveNotification(e.document, e.reason).catch(error => {
           this.options.logger?.error('Unable to send notification to server', error)
         })
       }))
@@ -454,7 +454,7 @@ export class LanguageClient implements Disposable {
     return disposableCollection
   }
 
-  public async sendWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): Promise<void> {
+  private async sendDocumentWillSaveNotification (document: TextDocument, reason: TextDocumentSaveReason): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentNotification.type, document)
@@ -468,7 +468,14 @@ export class LanguageClient implements Disposable {
     }
   }
 
-  public async sendWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
+  public async sendWillSaveNotification (uri: string, reason: TextDocumentSaveReason): Promise<void> {
+    const document = this.currentDocuments.get(uri)
+    if (document != null) {
+      await this.sendDocumentWillSaveNotification(document, reason)
+    }
+  }
+
+  private async sendDocumentWillSaveWaitUntil (document: TextDocument, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const willSaveWaitUntilOptions = serverCapabilities.getTextDocumentNotificationOptions(WillSaveTextDocumentWaitUntilRequest.type, document)
@@ -484,7 +491,16 @@ export class LanguageClient implements Disposable {
     return null
   }
 
-  public async sendDidSaveNotification (document: TextDocument): Promise<void> {
+  public async sendWillSaveWaitUntil (uri: string, reason: TextDocumentSaveReason, token?: rpc.CancellationToken): Promise<TextEdit[] | null> {
+    const document = this.currentDocuments.get(uri)
+    if (document != null) {
+      return await this.sendDocumentWillSaveWaitUntil(document, reason, token)
+    } else {
+      return null
+    }
+  }
+
+  private async sendDocumentDidSaveNotification (document: TextDocument, text: string): Promise<void> {
     const serverCapabilities = this.serverCapabilities!
     const serverConnection = this.connection!
     const saveOptions = serverCapabilities.getTextDocumentNotificationOptions(DidSaveTextDocumentNotification.type, document)
@@ -494,8 +510,15 @@ export class LanguageClient implements Disposable {
         textDocument: {
           uri: document.uri
         },
-        text: includeText ? document.getText() : undefined
+        text: includeText ? text : undefined
       })
+    }
+  }
+
+  public async sendDidSaveNotification (uri: string, text: string): Promise<void> {
+    const document = this.currentDocuments.get(uri)
+    if (document != null) {
+      await this.sendDocumentDidSaveNotification(document, text)
     }
   }
 
