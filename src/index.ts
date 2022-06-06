@@ -3,7 +3,7 @@ import { bindLanguageClient, ConnectionClosedError, EndCause, LanguageClientBind
 import { ConnectionRequestCache } from './tools/cache'
 import { DisposableCollection } from './tools/disposable'
 
-export { bindLanguageClient, createLanguageClient }
+export { bindLanguageClient, createLanguageClient, DisposableCollection }
 
 export type {
   LanguageClientDisposeReason,
@@ -14,6 +14,5 @@ export type {
   ConnectionClosedError,
   BindContext,
   ConnectionRequestCache,
-  EndCause,
-  DisposableCollection
+  EndCause
 }
