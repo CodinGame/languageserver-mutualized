@@ -16,7 +16,7 @@
     "ws": "^8.5.0"
   },
   "scripts": {
-    "start:server": "ts-node src/server.ts",
+    "start:server": "node --loader ts-node/esm src/server.ts",
     "start:client": "webpack serve --progress --config webpack.config.ts",
     "start": "concurrently \"npm run start:server\" \"npm run start:client\""
   },
