@@ -6,7 +6,7 @@ import cp from 'child_process'
 
 // Start the server once
 const extJsonServerPath = path.resolve(__dirname, 'ext-json-server.ts')
-const serverProcess = cp.spawn('ts-node', [extJsonServerPath])
+const serverProcess = cp.spawn('node', ['--loader', 'ts-node/esm', extJsonServerPath])
 serverProcess.on('error', error => console.error(`Launching Server failed: ${error}`))
 serverProcess.stderr.on('data', data => console.error(`Server error: ${data}`))
 
