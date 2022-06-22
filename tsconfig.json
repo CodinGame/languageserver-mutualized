@@ -1,31 +1,22 @@
 {
+  "extends": "@codingame/tsconfig",
   "compilerOptions": {
-    "allowJs": true,
-    "strict": true,
     "module": "commonjs",
     "outDir": "dist",
     "resolveJsonModule": true,
     "sourceMap": true,
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
     "moduleResolution": "node",
     "importHelpers": true,
     "isolatedModules": true,
-    "forceConsistentCasingInFileNames": true,
-    "noImplicitAny": true,
     "target": "ES2019",
     "lib": ["ESNext"],
     "declaration": true,
-    "skipLibCheck": true,
-    "noUncheckedIndexedAccess": true
+    "skipLibCheck": true
   },
   "include": [
     "src/**/*",
     "tests/**/*"
-  ],
-  "ts-node": {
-    "files": true
-  }
+  ]
 }
