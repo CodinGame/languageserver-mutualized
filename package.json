@@ -36,6 +36,8 @@
     "winston": "^3.6.0"
   },
   "devDependencies": {
+    "@codingame/eslint-config": "^1.1.2",
+    "@codingame/tsconfig": "^1.0.5",
     "@types/debounce": "^1.2.1",
     "@types/glob-to-regexp": "^0.4.1",
     "@types/jest": "^27.5.1",
@@ -49,8 +51,6 @@
     "eslint-config-standard": "^17.0.0",
     "eslint-plugin-import": "^2.26.0",
     "eslint-plugin-jest": "^26.1.5",
-    "eslint-plugin-n": "^15.2.0",
-    "eslint-plugin-promise": "^6.0.0",
     "eslint-plugin-unused-imports": "^2.0.0",
     "jest": "^28.1.0",
     "standard": "^17.0.0",
