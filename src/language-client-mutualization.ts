@@ -240,6 +240,9 @@ function bindClientToServer (
           documentChanges: params.edit.documentChanges
             ?.filter(TextDocumentEdit.is)
             .filter(({ textDocument }) => isDocumentOpen(textDocument.uri))
+            // Client & server document versions are not necessarily the same and some edit operations can be ignored on the client side because of that.
+            // For now we just send back the client version but it's not 100% safe.
+            // A better solution would be to keep track of each client document version associated to a server version.
             .map(({ textDocument, ...documentEdit }) => ({
               ...documentEdit,
               textDocument: {
