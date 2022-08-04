@@ -239,7 +239,7 @@ function bindClientToServer (
             : undefined,
           documentChanges: params.edit.documentChanges
             ?.filter(TextDocumentEdit.is)
-            .filter(({ textDocument }) => isDocumentOpen(textDocument.uri) && documents.get(textDocument.uri) != null)
+            .filter(({ textDocument }) => isDocumentOpen(textDocument.uri))
             .map(({ textDocument, ...documentEdit }) => ({
               ...documentEdit,
               textDocument: {
