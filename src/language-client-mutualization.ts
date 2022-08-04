@@ -237,12 +237,16 @@ function bindClientToServer (
               Object.entries(params.edit.changes).filter(([uri]) => isDocumentOpen(uri))
             )
             : undefined,
-          documentChanges: params.edit.documentChanges?.filter(documentEdit => {
-            if (TextDocumentEdit.is(documentEdit)) {
-              return isDocumentOpen(documentEdit.textDocument.uri)
-            }
-            return false
-          })
+          documentChanges: params.edit.documentChanges
+            ?.filter(TextDocumentEdit.is)
+            .filter(({ textDocument }) => isDocumentOpen(textDocument.uri) && documents.get(textDocument.uri) != null)
+            .map(({ textDocument, ...documentEdit }) => ({
+              ...documentEdit,
+              textDocument: {
+                ...textDocument,
+                version: documents.get(textDocument.uri)!.version
+              }
+            }))
         }
       })
     })))
