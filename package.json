@@ -3,6 +3,7 @@
   "version": "1.2.2",
   "description": "A tool to plug multiple clients over a single language server implementation",
   "main": "dist/index.js",
+  "module": "dist/esm/index.js",
   "types": "dist/index.d.ts",
   "repository": {
     "type": "git",
@@ -16,7 +17,7 @@
     "test": "jest",
     "test:watch": "jest --watch",
     "build": "npm run lint && npm run compile && npm run test",
-    "compile": "tsc",
+    "compile": "tsc && tsc --project tsconfig.cjs.json",
     "lint": "eslint --ext ts src"
   },
   "author": "",
