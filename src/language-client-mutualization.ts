@@ -261,11 +261,14 @@ function bindClientToServer (
       })))
     }
 
-    if (options.unknownClientRequestHandler != null) {
-      disposableCollection.push(clientConnection.onRequest(bindContext((method, params, token) => {
-        return options.unknownClientRequestHandler?.(serverConnection, method, params, token)
-      })))
-    }
+    disposableCollection.push(clientConnection.onRequest(bindContext((method, params, token) => {
+      // Java JDT:LS defines a lot of `java/XXX` requests, let's forward them as well
+      if (method.startsWith('java/')) {
+        onRequestEmitter.fire()
+        return serverConnection.sendRequest(method, params, token)
+      }
+      return options.unknownClientRequestHandler?.(serverConnection, method, params, token)
+    })))
 
     disposableCollection.push(clientConnection.onNotification(DidChangeConfigurationNotification.type, bindContext(() => {
       // There is multiple clients on the server, what to do with the configuration?
