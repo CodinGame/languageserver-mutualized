@@ -96,11 +96,15 @@ export function synchronizeLanguageServerCapabilities (
   try {
     // Synchronizing dynamic server capabilities
     const sendRegistrationRequest = (registrations: readonly Registration[]) => {
-      clientConnection.sendRequest(RegistrationRequest.type, {
-        registrations: registrations.filter(r => !IGNORED_REGISTRATION_METHOD.has(r.method)).map(adaptRegistration)
-      }).catch(error => {
-        logger?.error('Unable to send registration requestion to client', { error })
-      })
+      // Send registration one by one even if it's possible to send them all at once
+      // Because C# LSP sends duplicated capabilities that make the client ignore the next capabilities in the list
+      for (const registration of registrations.filter(r => !IGNORED_REGISTRATION_METHOD.has(r.method)).map(adaptRegistration)) {
+        clientConnection.sendRequest(RegistrationRequest.type, {
+          registrations: [registration]
+        }).catch(error => {
+          logger?.error('Unable to send registration requestion to client', { error })
+        })
+      }
     }
     const registrationRequests = watchableServerCapabilities.getRegistrationRequests()
     if (registrationRequests.length > 0) {
